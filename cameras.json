@@ -9,46 +9,143 @@
       "streamUrl": "https://www.youtube.com/embed/4Zu64CmAjMo",
       "enabled": true,
       "location": {
-        "area": "Sea Point",
+        "area": null,
         "lat": -33.908065957121714,
         "lng": 18.395474122371432
       }
     },
     {
-      "id": "clifton-4th",
-      "name": "Clifton 4th Beach",
+      "id": "cape-town-city-bowl",
+      "name": "Cape Town City Bowl",
       "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/pMhXWpyUhsk",
+      "streamUrl": "https://www.youtube.com/embed/K5Ll-ue2fu8",
       "enabled": true,
       "location": {
-        "area": "Atlantic Seaboard",
-        "lat": -33.940864965224556,
-        "lng": 18.375675864474236 
-      } 
+        "area": null,
+        "lat": null,
+        "lng": null
+      }
     },
     {
-      "id": "strand-false-bay",
+      "id": "muizenberg-surfers-corner",
+      "name": "Muizenberg – Surfers Corner",
+      "type": "youtube",
+      "streamUrl": "https://www.youtube.com/embed/70gObI9oeVU",
+      "enabled": true,
+      "location": {
+        "area": null,
+        "lat": null,
+        "lng": null
+      }
+    },
+    {
+      "id": "signal-hill",
+      "name": "Signal Hill",
+      "type": "youtube",
+      "streamUrl": "https://www.youtube.com/embed/-Qi7IXhSScA",
+      "enabled": true,
+      "location": {
+        "area": null,
+        "lat": null,
+        "lng": null
+      }
+    },
+    {
+      "id": "strand-beach-false-bay",
       "name": "Strand Beach – False Bay",
       "type": "youtube",
       "streamUrl": "https://www.youtube.com/embed/MbHfoOpSfl4",
       "enabled": true,
       "location": {
-        "area": "Strand",
+        "area": null,
         "lat": -34.1058076979825,
         "lng": 18.816865309127948
       }
     },
     {
-  "id": "muizenberg-surfers-corner",
-  "name": "Muizenberg – Surfers Corner",
-  "type": "youtube",
-  "streamUrl": "https://www.youtube.com/embed/70gObI9oeVU",
-  "enabled": true,
-  "location": {
-    "area": "Muizenberg",
-    "lat": -34.110350826319106,
-    "lng": 18.466317886580057
-  }
-}
+      "id": "milnerton-table-mountain",
+      "name": "Milnerton – View of Table Mountain",
+      "type": "youtube",
+      "streamUrl": "https://www.youtube.com/embed/z1PJqpgZccg",
+      "enabled": true,
+      "location": {
+        "area": null,
+        "lat": null,
+        "lng": null
+      }
+    },
+    {
+      "id": "somerset-west-table-mountain",
+      "name": "Somerset West – View of Table Mountain",
+      "type": "youtube",
+      "streamUrl": "https://www.youtube.com/embed/i5R4ZlVLzLI",
+      "enabled": true,
+      "location": {
+        "area": null,
+        "lat": null,
+        "lng": null
+      }
+    },
+    {
+      "id": "kalk-bay-brass-bell-waves",
+      "name": "Kalk Bay – Brass Bell (Waves & Mountain)",
+      "type": "youtube",
+      "streamUrl": "https://www.youtube.com/embed/GlUD1dHGKLo",
+      "enabled": true,
+      "location": {
+        "area": null,
+        "lat": null,
+        "lng": null
+      }
+    },
+    {
+      "id": "blouberg-beach-table-mountain",
+      "name": "Blouberg Beach – View of Table Mountain",
+      "type": "youtube",
+      "streamUrl": "https://www.youtube.com/embed/YfwTcW1IkN4",
+      "enabled": true,
+      "location": {
+        "area": null,
+        "lat": null,
+        "lng": null
+      }
+    },
+    {
+      "id": "table-mountain-panomax",
+      "name": "Table Mountain – Panomax Summit View",
+      "type": "mp4",
+      "streamUrl": "https://video.panomax.com/cams/5058/videos/5058_fullHD.mp4",
+      "enabled": true,
+      "location": {
+        "area": null,
+        "lat": null,
+        "lng": null
+      }
+    },
+    {
+      "id": "kalk-bay-brass-bell-harbour",
+      "name": "Kalk Bay – Brass Bell (Tidal Pool & Harbour)",
+      "type": "youtube",
+      "streamUrl": "https://www.youtube.com/embed/5WnsEXvpfho",
+      "enabled": true,
+      "location": {
+        "area": null,
+        "lat": null,
+        "lng": null
+      }
+    },
+    {
+      "id": "clifton-4th-beach",
+      "name": "Clifton 4th Beach",
+      "type": "youtube",
+      "streamUrl": "https://www.youtube.com/embed/pMhXWpyUhsk",
+      "enabled": true,
+      "location": {
+        "area": null,
+        "lat": -33.940864965224556,
+        "lng": 18.375675864474236 
+      }
+    }
   ]
 }
+
