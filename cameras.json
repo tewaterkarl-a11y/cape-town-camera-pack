@@ -37,6 +37,18 @@
         "lat": -34.1058076979825,
         "lng": 18.816865309127948
       }
-    }
+    },
+    {
+  "id": "muizenberg-surfers-corner",
+  "name": "Muizenberg – Surfers Corner",
+  "type": "youtube",
+  "streamUrl": "https://www.youtube.com/embed/70gObI9oeVU",
+  "enabled": true,
+  "location": {
+    "area": "Muizenberg",
+    "lat": -34.110350826319106,
+    "lng": 18.466317886580057
+  }
+}
   ]
 }
