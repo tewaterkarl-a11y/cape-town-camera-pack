@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "updated": "2026-01-21",
+  "cameras": [
+    {
+      "id": "clifton-4th",
+      "name": "Clifton 4th Beach",
+      "area": "Atlantic Seaboard",
+      "type": "youtube_live",
+      "embed_url": "https://www.youtube.com/embed/pMhXWpyUhsk?autoplay=1&mute=1&controls=0&rel=0&playsinline=1",
+      "lat": -33.9406,
+      "lng": 18.3774,
+      "active": true
+    }
+  ]
+}
