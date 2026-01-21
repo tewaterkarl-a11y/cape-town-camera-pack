@@ -25,66 +25,6 @@
         "lat": null,
         "lng": null
       }
-    },
-    {
-      "id": "cape-town-city-bowl",
-      "name": "Cape Town City Bowl",
-      "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/K5Ll-ue2fu8?autoplay=1&mute=1&controls=0&rel=0&playsinline=1",
-      "enabled": true,
-      "location": {
-        "area": "City Bowl",
-        "lat": null,
-        "lng": null
-      }
-    },
-    {
-      "id": "muizenberg-surfers-corner",
-      "name": "Muizenberg – Surfers Corner",
-      "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/70gObI9oeVU?autoplay=1&mute=1&controls=0&rel=0&playsinline=1",
-      "enabled": true,
-      "location": {
-        "area": "Muizenberg",
-        "lat": null,
-        "lng": null
-      }
-    },
-    {
-      "id": "signal-hill",
-      "name": "Signal Hill",
-      "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/-Qi7IXhSScA?autoplay=1&mute=1&controls=0&rel=0&playsinline=1",
-      "enabled": true,
-      "location": {
-        "area": "Signal Hill",
-        "lat": null,
-        "lng": null
-      }
-    },
-    {
-      "id": "strand-beach-false-bay",
-      "name": "Strand Beach – False Bay",
-      "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/MbHfoOpSfl4?autoplay=1&mute=1&controls=0&rel=0&playsinline=1",
-      "enabled": true,
-      "location": {
-        "area": "Strand",
-        "lat": null,
-        "lng": null
-      }
-    },
-    {
-      "id": "milnerton-table-mountain",
-      "name": "Milnerton – View of Table Mountain",
-      "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/z1PJqpgZccg?autoplay=1&mute=1&controls=0&rel=0&playsinline=1",
-      "enabled": true,
-      "location": {
-        "area": "Milnerton",
-        "lat": null,
-        "lng": null
-      }
     }
   ]
 }
