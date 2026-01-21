@@ -3,6 +3,18 @@
   "updated": "2026-01-21",
   "cameras": [
     {
+      "id": "seapoint-lions-head",
+      "name": "Sea Point Promenade – Lion’s Head",
+      "type": "youtube",
+      "streamUrl": "https://www.youtube.com/embed/4Zu64CmAjMo?autoplay=1&mute=1&controls=0&rel=0&playsinline=1",
+      "enabled": true,
+      "location": {
+        "area": "Sea Point",
+        "lat": -33.908065957121714,
+        "lng": 18.395474122371432
+      }
+    },
+    {
       "id": "clifton-4th",
       "name": "Clifton 4th Beach",
       "type": "youtube",
@@ -10,22 +22,21 @@
       "enabled": true,
       "location": {
         "area": "Atlantic Seaboard",
-        "lat": -33.94078502493721,
-        "lng": 18.37562991501743
-      }
+        "lat": -33.940864965224556,
+        "lng": 18.375675864474236 
+      } 
     },
     {
-      "id": "seapoint-lions-head",
-      "name": "Seapoint Promenade – Lion’s Head",
+      "id": "strand-false-bay",
+      "name": "Strand Beach – False Bay",
       "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/4Zu64CmAjMo?autoplay=1&mute=1&controls=0&rel=0&playsinline=1",
+      "streamUrl": "https://www.youtube.com/embed/MbHfoOpSfl4?autoplay=1&mute=1&controls=0&rel=0&playsinline=1",
       "enabled": true,
       "location": {
-        "area": "Sea Point",
-        "lat": -33.908008007647034,
-        "lng": 18.395354377507086
+        "area": "Strand",
+        "lat": -34.1058076979825,
+        "lng": 18.816865309127948
       }
     }
   ]
 }
-
