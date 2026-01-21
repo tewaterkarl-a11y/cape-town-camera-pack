@@ -22,9 +22,10 @@
       "enabled": true,
       "location": {
         "area": "Sea Point",
-        "lat": null,
-        "lng": null
+        "lat": -33.908008007647034,
+        "lng": 18.395354377507086
       }
     }
   ]
 }
+
