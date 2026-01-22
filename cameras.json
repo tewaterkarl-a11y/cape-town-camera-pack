@@ -111,18 +111,6 @@
       }
     },
     {
-      "id": "table-mountain-panomax",
-      "name": "Table Mountain – Panomax Summit View",
-      "type": "mp4",
-      "streamUrl": "https://video.panomax.com/cams/5058/videos/5058_fullHD.mp4",
-      "enabled": true,
-      "location": {
-        "area": null,
-        "lat": null,
-        "lng": null
-      }
-    },
-    {
       "id": "kalk-bay-brass-bell-harbour",
       "name": "Kalk Bay – Brass Bell (Tidal Pool & Harbour)",
       "type": "youtube",
