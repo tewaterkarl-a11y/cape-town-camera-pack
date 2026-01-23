@@ -75,18 +75,6 @@
       }
     },
     {
-      "id": "somerset-west-table-mountain",
-      "name": "Somerset West – View of Table Mountain",
-      "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/i5R4ZlVLzLI",
-      "enabled": true,
-      "location": {
-        "area": null,
-        "lat": null,
-        "lng": null
-      }
-    },
-    {
       "id": "kalk-bay-brass-bell-waves",
       "name": "Kalk Bay – Brass Bell (Waves & Mountain)",
       "type": "youtube",
