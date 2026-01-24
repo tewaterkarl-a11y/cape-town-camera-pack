@@ -99,18 +99,6 @@
       }
     },
     {
-      "id": "kalk-bay-brass-bell-harbour",
-      "name": "Kalk Bay – Brass Bell (Tidal Pool & Harbour)",
-      "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/5WnsEXvpfho",
-      "enabled": true,
-      "location": {
-        "area": null,
-        "lat": null,
-        "lng": null
-      }
-    },
-    {
       "id": "clifton-4th-beach",
       "name": "Clifton 4th Beach",
       "type": "youtube",
