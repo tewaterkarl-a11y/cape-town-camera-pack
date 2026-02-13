@@ -15,18 +15,6 @@
       }
     },
     {
-      "id": "cape-town-city-bowl",
-      "name": "Cape Town City Bowl",
-      "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/K5Ll-ue2fu8",
-      "enabled": true,
-      "location": {
-        "area": null,
-        "lat": null,
-        "lng": null
-      }
-    },
-    {
       "id": "muizenberg-surfers-corner",
       "name": "Muizenberg – Surfers Corner",
       "type": "youtube",
