@@ -85,32 +85,7 @@
         "lat": null,
         "lng": null
       }
-    },
-    {
-      "id": "clifton-4th-beach",
-      "name": "Clifton 4th Beach",
-      "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/pMhXWpyUhsk",
-      "enabled": true,
-      "location": {
-        "area": null,
-        "lat": -33.940864965224556,
-        "lng": 18.375675864474236 
-      }
-    },
-
-  {
-  "id": "table-mountain-panomax",
-  "name": "Table Mountain – Panomax",
-  "type": "mp4",
-  "streamUrl": "https://video.panomax.com/cams/5058/videos/5058_HDready.mp4",
-  "enabled": true,
-  "location": {
-    "area": "Table Mountain",
-    "lat": -33.95723,
-    "lng": 18.40292
-  }
- }
+    }
     
   ]
 }
