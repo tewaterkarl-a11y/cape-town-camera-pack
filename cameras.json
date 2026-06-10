@@ -1,6 +1,6 @@
 {
-  "version": "1.0",
-  "updated": "2026-01-21",
+  "version": "1.1",
+  "updated": "2026-06-10",
   "cameras": [
     {
       "id": "seapoint-lions-head",
@@ -19,7 +19,6 @@
       "name": "Muizenberg – Surfers Corner",
       "type": "youtube",
       "streamUrl": "https://www.youtube.com/embed/Sgf3kvYlALk",
-      
       "enabled": true,
       "location": {
         "area": null,
@@ -40,18 +39,6 @@
       }
     },
     {
-      "id": "strand-beach-false-bay",
-      "name": "Strand Beach – False Bay",
-      "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/S25r75Aa20c",
-      "enabled": true,
-      "location": {
-        "area": null,
-        "lat": -34.1058076979825,
-        "lng": 18.816865309127948
-      }
-    },
-    {
       "id": "milnerton-table-mountain",
       "name": "Milnerton – View of Table Mountain",
       "type": "youtube",
@@ -62,21 +49,6 @@
         "lat": null,
         "lng": null
       }
-    },
-    {
-      "id": "kalk-bay-brass-bell-waves",
-      "name": "Kalk Bay – Brass Bell (Waves & Mountain)",
-      "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/ZfiGeTowMWU",
-      "enabled": true,
-      "location": {
-        "area": null,
-        "lat": null,
-        "lng": null
-      }
     }
-
-    
   ]
 }
-
