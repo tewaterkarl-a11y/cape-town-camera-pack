@@ -1,0 +1,64 @@
+name: Monitor site and cameras
+
+on:
+  schedule:
+    - cron: "23 */6 * * *" # every 6 hours (GitHub cron is best-effort, not exact)
+  workflow_dispatch: {}
+
+permissions:
+  issues: write
+  contents: read
+
+concurrency:
+  group: monitor
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_TITLE: "Monitor alert: site or camera problem detected"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run health checks
+        run: |
+          chmod +x scripts/check.sh
+          REPORT_FILE=report.txt scripts/check.sh
+
+      - name: Open, update, or close the alert issue
+        run: |
+          set -u
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "in:title \"$ISSUE_TITLE\"" --json number --jq '.[0].number // empty')
+
+          if [ -s report.txt ]; then
+            {
+              echo "@tewaterkarl-a11y — the monitor found problems on $(date -u '+%Y-%m-%d %H:%M UTC'):"
+              echo
+              sed 's/^/- /' report.txt
+              echo
+              echo "**How to fix a dead camera:** find the stream's new live video ID on YouTube,"
+              echo "then update its \`streamUrl\` in \`cameras.json\` in this repo (or set"
+              echo "\`\"enabled\": false\`). Visitors pick up the change on next load — no redeploy."
+              echo
+              echo "_This issue auto-closes once all checks pass again._"
+            } > body.md
+
+            if [ -n "$existing" ]; then
+              gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file body.md
+              echo "Updated existing alert issue #$existing"
+            else
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$ISSUE_TITLE" --body-file body.md
+              echo "Opened new alert issue"
+            fi
+          else
+            if [ -n "$existing" ]; then
+              gh issue close "$existing" --repo "$GITHUB_REPOSITORY" \
+                --comment "All checks passing again as of $(date -u '+%Y-%m-%d %H:%M UTC'). Auto-closing."
+              echo "Closed recovered alert issue #$existing"
+            else
+              echo "All healthy; nothing to do."
+            fi
+          fi
