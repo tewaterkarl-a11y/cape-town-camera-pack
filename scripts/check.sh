@@ -49,25 +49,61 @@ check_camera() {
 
 total=0
 failed_ids=()
-while IFS=$'\t' read -r id name url; do
-  video_id=$(echo "$url" | sed -E 's#.*/embed/([A-Za-z0-9_-]{11}).*#\1#')
-  total=$((total + 1))
-  check_camera "$id" "$name" "$video_id"
-  rc=$?
-  if [ "$rc" -ne 0 ]; then
-    sleep 10  # one retry; transient fetch issues are common from CI runners
+
+if [ -n "${YT_API_KEY:-}" ]; then
+  # Preferred path: official YouTube Data API. One batched call; reliable from
+  # CI (unlike scraping, which YouTube bot-walls for datacenter IPs).
+  # snippet.liveBroadcastContent is "live" while streaming, "none" once ended.
+  mapfile -t rows < <(jq -r '.cameras[] | select(.enabled) | [.id, .name, .streamUrl] | @tsv' cameras.json)
+  ids=""
+  for row in "${rows[@]}"; do
+    url=$(echo "$row" | cut -f3)
+    vid=$(echo "$url" | sed -E 's#.*/embed/([A-Za-z0-9_-]{11}).*#\1#')
+    ids="${ids:+$ids,}$vid"
+  done
+  total=${#rows[@]}
+  api_resp=$(curl -fsS --max-time 20 \
+    "https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${ids}&key=${YT_API_KEY}" 2>/dev/null)
+  if [ -z "$api_resp" ]; then
+    echo "YouTube Data API call failed — skipping camera checks this run." >&2
+  else
+    for row in "${rows[@]}"; do
+      id=$(echo "$row" | cut -f1); name=$(echo "$row" | cut -f2); url=$(echo "$row" | cut -f3)
+      vid=$(echo "$url" | sed -E 's#.*/embed/([A-Za-z0-9_-]{11}).*#\1#')
+      state=$(echo "$api_resp" | jq -r --arg v "$vid" '.items[] | select(.id == $v) | .snippet.liveBroadcastContent // "missing"')
+      if [ -z "$state" ]; then
+        failed_ids+=("CAMERA REMOVED: ${name} (${id}, video ${vid}) — video no longer exists or is private")
+      elif [ "$state" != "live" ]; then
+        failed_ids+=("CAMERA NOT LIVE: ${name} (${id}, video ${vid}) — liveBroadcastContent=${state}")
+      fi
+    done
+    checks_trusted=true  # API answers are real data; no bot-wall ambiguity
+  fi
+else
+  # Fallback path (no API key): scrape-based checks. YouTube usually bot-walls
+  # CI runners, in which case the guard below skips camera alerts entirely.
+  while IFS=$'\t' read -r id name url; do
+    video_id=$(echo "$url" | sed -E 's#.*/embed/([A-Za-z0-9_-]{11}).*#\1#')
+    total=$((total + 1))
     check_camera "$id" "$name" "$video_id"
     rc=$?
-  fi
-  case "$rc" in
-    1) failed_ids+=("CAMERA NOT LIVE: ${name} (${id}, video ${video_id}) — stream has ended or is offline") ;;
-    2) failed_ids+=("CAMERA CHECK FAILED: ${name} (${id}, video ${video_id}) — could not reach YouTube for this video") ;;
-  esac
-done < <(jq -r '.cameras[] | select(.enabled) | [.id, .name, .streamUrl] | @tsv' cameras.json)
+    if [ "$rc" -ne 0 ]; then
+      sleep 10  # one retry; transient fetch issues are common from CI runners
+      check_camera "$id" "$name" "$video_id"
+      rc=$?
+    fi
+    case "$rc" in
+      1) failed_ids+=("CAMERA NOT LIVE: ${name} (${id}, video ${video_id}) — stream has ended or is offline") ;;
+      2) failed_ids+=("CAMERA CHECK FAILED: ${name} (${id}, video ${video_id}) — could not reach YouTube for this video") ;;
+    esac
+  done < <(jq -r '.cameras[] | select(.enabled) | [.id, .name, .streamUrl] | @tsv' cameras.json)
+fi
 
-# Sanity guard: if EVERY camera failed but the site is up, the runner is almost
-# certainly being bot-walled by YouTube. Don't raise a false alarm.
-if [ "$total" -gt 0 ] && [ "${#failed_ids[@]}" -eq "$total" ] && [ "$site_ok" = true ]; then
+# Sanity guard (scrape path only): if EVERY camera failed but the site is up,
+# the runner is almost certainly being bot-walled by YouTube. Don't raise a
+# false alarm. API results are trusted as-is.
+if [ "${checks_trusted:-false}" != true ] && [ "$total" -gt 0 ] && \
+   [ "${#failed_ids[@]}" -eq "$total" ] && [ "$site_ok" = true ]; then
   echo "All ${total} cameras unreadable from this runner — likely YouTube bot wall, not real outages. Skipping camera alerts." >&2
 else
   for line in "${failed_ids[@]}"; do

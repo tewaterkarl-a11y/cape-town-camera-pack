@@ -23,6 +23,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run health checks
+        env:
+          YT_API_KEY: ${{ secrets.YT_API_KEY }}
         run: |
           chmod +x scripts/check.sh
           REPORT_FILE=report.txt scripts/check.sh
