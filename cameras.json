@@ -1,6 +1,6 @@
 {
-  "version": "1.1",
-  "updated": "2026-06-10",
+  "version": "1.2",
+  "updated": "2026-06-12",
   "cameras": [
     {
       "id": "seapoint-lions-head",
@@ -12,6 +12,18 @@
         "area": null,
         "lat": -33.908065957121714,
         "lng": 18.395474122371432
+      }
+    },
+    {
+      "id": "clifton-fourth-beach",
+      "name": "Clifton 4th Beach",
+      "type": "youtube",
+      "streamUrl": "https://www.youtube.com/embed/IGu55JrxyHU",
+      "enabled": true,
+      "location": {
+        "area": null,
+        "lat": -33.9406,
+        "lng": 18.3753
       }
     },
     {
@@ -36,6 +48,18 @@
         "area": null,
         "lat": null,
         "lng": null
+      }
+    },
+    {
+      "id": "strand-beach-false-bay",
+      "name": "Strand Beach – False Bay",
+      "type": "youtube",
+      "streamUrl": "https://www.youtube.com/embed/h4Hj66eoEr4",
+      "enabled": true,
+      "location": {
+        "area": null,
+        "lat": -34.1058076979825,
+        "lng": 18.816865309127948
       }
     },
     {
