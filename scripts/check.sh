@@ -19,16 +19,29 @@ if ! curl -fsS --max-time 20 "$SITE_URL" | grep -q "Cape Town Window"; then
   fi
 fi
 
-# --- 2. Camera liveness (YouTube-aware: isLiveNow, not URL reachability) -------
+# --- 2. Camera liveness (YouTube-aware: isLive, not URL reachability) ----------
+# Uses the innertube player endpoint: videoDetails.isLive is true only while a
+# stream is actually live, and the endpoint is not consent/bot-walled the way
+# watch pages are for datacenter IPs. Falls back to the watch page if needed.
 check_camera() {
   local id="$1" name="$2" video_id="$3"
+  local resp
+  resp=$(curl -fsS --max-time 20 -A "$UA" \
+    -H "Content-Type: application/json" \
+    -X POST "https://www.youtube.com/youtubei/v1/player" \
+    -d "{\"context\":{\"client\":{\"clientName\":\"WEB\",\"clientVersion\":\"2.20240101.00.00\"}},\"videoId\":\"${video_id}\"}" \
+    2>/dev/null)
+  if [ -n "$resp" ] && echo "$resp" | jq -e '.videoDetails != null' >/dev/null 2>&1; then
+    if echo "$resp" | jq -e '.videoDetails.isLive == true' >/dev/null 2>&1; then
+      return 0
+    fi
+    return 1
+  fi
+  # Fallback: watch-page scrape (works from residential IPs, often bot-walled in CI)
   local html
   html=$(curl -fsS --max-time 20 -A "$UA" -H "Accept-Language: en" \
     "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null) || return 2
   if echo "$html" | grep -q '"isLiveNow":true'; then
-    if echo "$html" | grep -q '"playableInEmbed":false'; then
-      return 3  # live but embedding disabled
-    fi
     return 0
   fi
   return 1
@@ -48,8 +61,7 @@ while IFS=$'\t' read -r id name url; do
   fi
   case "$rc" in
     1) failed_ids+=("CAMERA NOT LIVE: ${name} (${id}, video ${video_id}) — stream has ended or is offline") ;;
-    2) failed_ids+=("CAMERA CHECK FAILED: ${name} (${id}, video ${video_id}) — could not fetch watch page") ;;
-    3) failed_ids+=("CAMERA NOT EMBEDDABLE: ${name} (${id}, video ${video_id}) — live but embedding disabled") ;;
+    2) failed_ids+=("CAMERA CHECK FAILED: ${name} (${id}, video ${video_id}) — could not reach YouTube for this video") ;;
   esac
 done < <(jq -r '.cameras[] | select(.enabled) | [.id, .name, .streamUrl] | @tsv' cameras.json)
 
