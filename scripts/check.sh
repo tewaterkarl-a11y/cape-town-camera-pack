@@ -54,6 +54,8 @@ if [ -n "${YT_API_KEY:-}" ]; then
   # Preferred path: official YouTube Data API. One batched call; reliable from
   # CI (unlike scraping, which YouTube bot-walls for datacenter IPs).
   # snippet.liveBroadcastContent is "live" while streaming, "none" once ended.
+  # status.embeddable is false when the owner has disabled embedding, in which
+  # case the stream plays on YouTube but not inside the site's iframe.
   mapfile -t rows < <(jq -r '.cameras[] | select(.enabled) | [.id, .name, .streamUrl] | @tsv' cameras.json)
   ids=""
   for row in "${rows[@]}"; do
@@ -63,7 +65,7 @@ if [ -n "${YT_API_KEY:-}" ]; then
   done
   total=${#rows[@]}
   api_resp=$(curl -fsS --max-time 20 \
-    "https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${ids}&key=${YT_API_KEY}" 2>/dev/null)
+    "https://www.googleapis.com/youtube/v3/videos?part=snippet,status&id=${ids}&key=${YT_API_KEY}" 2>/dev/null)
   if [ -z "$api_resp" ]; then
     echo "YouTube Data API call failed — skipping camera checks this run." >&2
   else
@@ -71,10 +73,13 @@ if [ -n "${YT_API_KEY:-}" ]; then
       id=$(echo "$row" | cut -f1); name=$(echo "$row" | cut -f2); url=$(echo "$row" | cut -f3)
       vid=$(echo "$url" | sed -E 's#.*/embed/([A-Za-z0-9_-]{11}).*#\1#')
       state=$(echo "$api_resp" | jq -r --arg v "$vid" '.items[] | select(.id == $v) | .snippet.liveBroadcastContent // "missing"')
+      embeddable=$(echo "$api_resp" | jq -r --arg v "$vid" '.items[] | select(.id == $v) | .status.embeddable')
       if [ -z "$state" ]; then
         failed_ids+=("CAMERA REMOVED: ${name} (${id}, video ${vid}) — video no longer exists or is private")
       elif [ "$state" != "live" ]; then
         failed_ids+=("CAMERA NOT LIVE: ${name} (${id}, video ${vid}) — liveBroadcastContent=${state}")
+      elif [ "$embeddable" = "false" ]; then
+        failed_ids+=("CAMERA NOT EMBEDDABLE: ${name} (${id}, video ${vid}) — live on YouTube but the owner disabled embedding, so it will not play on the site")
       fi
     done
     checks_trusted=true  # API answers are real data; no bot-wall ambiguity
