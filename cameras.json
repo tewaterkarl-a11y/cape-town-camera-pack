@@ -1,6 +1,6 @@
 {
-  "version": "1.2",
-  "updated": "2026-06-12",
+  "version": "1.3",
+  "updated": "2026-07-06",
   "cameras": [
     {
       "id": "seapoint-lions-head",
@@ -19,7 +19,7 @@
       "name": "Clifton 4th Beach",
       "type": "youtube",
       "streamUrl": "https://www.youtube.com/embed/IGu55JrxyHU",
-      "enabled": true,
+      "enabled": false,
       "location": {
         "area": null,
         "lat": -33.9406,
@@ -55,7 +55,7 @@
       "name": "Strand Beach – False Bay",
       "type": "youtube",
       "streamUrl": "https://www.youtube.com/embed/h4Hj66eoEr4",
-      "enabled": true,
+      "enabled": false,
       "location": {
         "area": null,
         "lat": -34.1058076979825,
@@ -67,7 +67,7 @@
       "name": "Milnerton – View of Table Mountain",
       "type": "youtube",
       "streamUrl": "https://www.youtube.com/embed/z1PJqpgZccg",
-      "enabled": true,
+      "enabled": false,
       "location": {
         "area": null,
         "lat": null,
