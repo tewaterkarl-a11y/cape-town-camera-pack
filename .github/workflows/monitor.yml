@@ -32,8 +32,23 @@ jobs:
       - name: Open, update, or close the alert issue
         run: |
           set -u
-          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
-            --search "in:title \"$ISSUE_TITLE\"" --json number --jq '.[0].number // empty')
+          # Find the open alert issue by exact title. Deliberately avoids
+          # --search: the search backend 504s often enough to fail an otherwise
+          # healthy run. One retry, then give up quietly — a transient GitHub
+          # outage should not look like a dead camera.
+          find_issue() {
+            gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
+              --json number,title \
+              --jq 'first(.[] | select(.title == env.ISSUE_TITLE) | .number) // empty'
+          }
+
+          if ! existing=$(find_issue); then
+            sleep 10
+            if ! existing=$(find_issue); then
+              echo "Could not reach the GitHub issues API; skipping issue update this run." >&2
+              exit 0
+            fi
+          fi
 
           if [ -s report.txt ]; then
             {
