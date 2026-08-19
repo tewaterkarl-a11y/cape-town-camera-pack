@@ -1,5 +1,5 @@
 {
-  "version": "1.6",
+  "version": "1.7",
   "updated": "2026-08-19",
   "cameras": [
     {
@@ -30,8 +30,8 @@
       "id": "muizenberg-surfers-corner",
       "name": "Muizenberg – Surfers Corner",
       "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/S75OGX7a3cs",
-      "enabled": false,
+      "streamUrl": "https://www.youtube.com/embed/C7RnivsVxXQ",
+      "enabled": true,
       "location": {
         "area": null,
         "lat": null,
@@ -70,6 +70,42 @@
       "enabled": false,
       "location": {
         "area": null,
+        "lat": null,
+        "lng": null
+      }
+    },
+    {
+      "id": "blouberg-table-mountain",
+      "name": "Bloubergstrand – Table Mountain Across the Bay",
+      "type": "youtube",
+      "streamUrl": "https://www.youtube.com/embed/vOLCjL4kv-w",
+      "enabled": true,
+      "location": {
+        "area": "Bloubergstrand",
+        "lat": null,
+        "lng": null
+      }
+    },
+    {
+      "id": "cbd-table-mountain",
+      "name": "City Bowl – Table Mountain from the CBD",
+      "type": "youtube",
+      "streamUrl": "https://www.youtube.com/embed/-xp8-I7Ad3Y",
+      "enabled": true,
+      "location": {
+        "area": "Cape Town CBD",
+        "lat": null,
+        "lng": null
+      }
+    },
+    {
+      "id": "table-mountain-lions-head",
+      "name": "Table Mountain & Lion’s Head Panorama",
+      "type": "youtube",
+      "streamUrl": "https://www.youtube.com/embed/PUIoAB8WdMY",
+      "enabled": true,
+      "location": {
+        "area": "City Bowl",
         "lat": null,
         "lng": null
       }
