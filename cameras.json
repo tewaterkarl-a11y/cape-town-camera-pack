@@ -1,6 +1,6 @@
 {
-  "version": "1.5",
-  "updated": "2026-07-25",
+  "version": "1.6",
+  "updated": "2026-08-19",
   "cameras": [
     {
       "id": "seapoint-lions-head",
@@ -31,7 +31,7 @@
       "name": "Muizenberg – Surfers Corner",
       "type": "youtube",
       "streamUrl": "https://www.youtube.com/embed/S75OGX7a3cs",
-      "enabled": true,
+      "enabled": false,
       "location": {
         "area": null,
         "lat": null,
