@@ -1,6 +1,6 @@
 {
-  "version": "1.7",
-  "updated": "2026-08-19",
+  "version": "1.8",
+  "updated": "2026-09-07",
   "cameras": [
     {
       "id": "seapoint-lions-head",
@@ -30,7 +30,7 @@
       "id": "muizenberg-surfers-corner",
       "name": "Muizenberg – Surfers Corner",
       "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/C7RnivsVxXQ",
+      "streamUrl": "https://www.youtube.com/embed/VuE8e798RuM",
       "enabled": true,
       "location": {
         "area": null,
@@ -90,7 +90,7 @@
       "id": "cbd-table-mountain",
       "name": "City Bowl – Table Mountain from the CBD",
       "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/-xp8-I7Ad3Y",
+      "streamUrl": "https://www.youtube.com/embed/RYYPQsxOyWc",
       "enabled": true,
       "location": {
         "area": "Cape Town CBD",
@@ -102,7 +102,7 @@
       "id": "table-mountain-lions-head",
       "name": "Table Mountain & Lion’s Head Panorama",
       "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/PUIoAB8WdMY",
+      "streamUrl": "https://www.youtube.com/embed/6OICn5EvsZ8",
       "enabled": true,
       "location": {
         "area": "City Bowl",
