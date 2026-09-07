@@ -1,0 +1,91 @@
+name: Auto-repoint dead cameras
+
+# When a camera dies it is almost always the same physical camera restarted
+# under a new video ID. Finding the replacement is deterministic, so this job
+# does the lookup and opens a PR with the change.
+#
+# It deliberately does NOT merge. A third-party stream should not reach the
+# live site without a person looking at it first.
+
+on:
+  schedule:
+    - cron: "47 3,15 * * *" # twice daily, offset from the 6-hourly monitor
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-repoint
+  cancel-in-progress: false
+
+jobs:
+  repoint:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BRANCH: auto/repoint-cameras
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Look for replacement stream IDs
+        id: repoint
+        env:
+          YT_API_KEY: ${{ secrets.YT_API_KEY }}
+        run: |
+          chmod +x scripts/auto-repoint.sh
+          SUMMARY_FILE=repoint-summary.md scripts/auto-repoint.sh
+
+      - name: Open or update the repoint PR
+        if: steps.repoint.outputs.changed != '' && steps.repoint.outputs.changed != '0'
+        run: |
+          set -eu
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # One long-lived branch, force-pushed each run, so repeated failures
+          # collect in a single PR instead of spawning a new one every time.
+          git checkout -B "$BRANCH"
+          git add cameras.json
+          git commit -m "Repoint dead cameras to their current live stream IDs
+
+          Opened automatically. Each replacement below was confirmed live and
+          embeddable through the YouTube Data API before being written.
+
+          $(cat repoint-summary.md)"
+          git push --force origin "$BRANCH"
+
+          {
+            echo "The monitor's dead cameras have been matched to their channel's current live stream."
+            echo
+            cat repoint-summary.md
+            echo
+            echo "### Before merging"
+            echo
+            echo "The Data API says these are live and embeddable, which is necessary but not sufficient."
+            echo "It cannot tell you the camera is pointing where the name claims. Worth opening each new"
+            echo "ID once to confirm the view still matches the camera it is replacing."
+            echo
+            echo "_Opened by the auto-repoint workflow. Not auto-merged on purpose._"
+          } > pr-body.md
+
+          existing=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --repo "$GITHUB_REPOSITORY" --body-file pr-body.md
+            echo "Updated existing repoint PR #$existing"
+          else
+            gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
+              --title "Repoint dead cameras to their current live stream IDs" --body-file pr-body.md
+            echo "Opened repoint PR"
+          fi
+
+      - name: Report cameras that could not be repointed
+        if: always()
+        run: |
+          if [ -s repoint-summary.md ]; then
+            echo "## Auto-repoint summary" >> "$GITHUB_STEP_SUMMARY"
+            cat repoint-summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "All enabled cameras healthy; nothing to repoint." >> "$GITHUB_STEP_SUMMARY"
+          fi

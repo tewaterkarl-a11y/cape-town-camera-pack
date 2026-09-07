@@ -1,5 +1,5 @@
 {
-  "version": "1.8",
+  "version": "1.9",
   "updated": "2026-09-07",
   "cameras": [
     {
@@ -12,7 +12,9 @@
         "area": null,
         "lat": -33.908065957121714,
         "lng": 18.395474122371432
-      }
+      },
+      "channelId": "UC9Ljd016Si9rv3KS-5CbpGg",
+      "titleMatch": "Sea Point"
     },
     {
       "id": "clifton-fourth-beach",
@@ -24,7 +26,9 @@
         "area": null,
         "lat": -33.9406,
         "lng": 18.3753
-      }
+      },
+      "channelId": "UCLmKcWr9EjhgrlivvJQovOQ",
+      "titleMatch": "Clifton"
     },
     {
       "id": "muizenberg-surfers-corner",
@@ -36,7 +40,9 @@
         "area": null,
         "lat": null,
         "lng": null
-      }
+      },
+      "channelId": "UCf6fbt2V_PXTFtdg1fruTDA",
+      "titleMatch": "Muizenberg"
     },
     {
       "id": "signal-hill",
@@ -48,7 +54,9 @@
         "area": null,
         "lat": null,
         "lng": null
-      }
+      },
+      "channelId": "UC9Ljd016Si9rv3KS-5CbpGg",
+      "titleMatch": "Signal Hill"
     },
     {
       "id": "strand-beach-false-bay",
@@ -60,7 +68,9 @@
         "area": null,
         "lat": -34.1058076979825,
         "lng": 18.816865309127948
-      }
+      },
+      "channelId": "UCFugE3twPWhIJnZsrFjJaBg",
+      "titleMatch": "Strand"
     },
     {
       "id": "milnerton-table-mountain",
@@ -72,7 +82,9 @@
         "area": null,
         "lat": null,
         "lng": null
-      }
+      },
+      "channelId": "UCFugE3twPWhIJnZsrFjJaBg",
+      "titleMatch": "Milnerton"
     },
     {
       "id": "blouberg-table-mountain",
@@ -84,7 +96,9 @@
         "area": "Bloubergstrand",
         "lat": null,
         "lng": null
-      }
+      },
+      "channelId": "UCLaxio5CTbT1gl5i8FB2-yw",
+      "titleMatch": "Bloubergstrand"
     },
     {
       "id": "cbd-table-mountain",
@@ -96,7 +110,9 @@
         "area": "Cape Town CBD",
         "lat": null,
         "lng": null
-      }
+      },
+      "channelId": "UC9Ljd016Si9rv3KS-5CbpGg",
+      "titleMatch": "Live Stream Table Mountain"
     },
     {
       "id": "table-mountain-lions-head",
@@ -108,7 +124,9 @@
         "area": "City Bowl",
         "lat": null,
         "lng": null
-      }
+      },
+      "channelId": "UCMyCO_-D2eLocsvoiGob7iw",
+      "titleMatch": "Cape Town Live Stream Webcam"
     }
   ]
 }
