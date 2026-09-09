@@ -1,6 +1,6 @@
 {
   "version": "1.9",
-  "updated": "2026-09-07",
+  "updated": "2026-09-09",
   "cameras": [
     {
       "id": "seapoint-lions-head",
@@ -104,7 +104,7 @@
       "id": "cbd-table-mountain",
       "name": "City Bowl – Table Mountain from the CBD",
       "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/RYYPQsxOyWc",
+      "streamUrl": "https://www.youtube.com/embed/0H6lU8WGA-c",
       "enabled": true,
       "location": {
         "area": "Cape Town CBD",
