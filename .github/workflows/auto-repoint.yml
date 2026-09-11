@@ -27,7 +27,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       BRANCH: auto/repoint-cameras
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Look for replacement stream IDs
         id: repoint

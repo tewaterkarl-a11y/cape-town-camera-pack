@@ -25,7 +25,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       ISSUE_TITLE: "Disabled camera is restorable"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Re-check disabled cameras
         env:
