@@ -20,7 +20,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       ISSUE_TITLE: "Monitor alert: site or camera problem detected"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Run health checks
         env:
