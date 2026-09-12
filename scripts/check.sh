@@ -4,19 +4,37 @@
 # the workflow decides whether to open/close the alert issue.
 set -u
 
-SITE_URL="https://capetownwindow.com"
+# The canonical address. The apex 301-redirects here, so check this one
+# directly rather than relying on a redirect hop.
+SITE_URL="https://www.capetownwindow.com"
+APEX_URL="https://capetownwindow.com"
 UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36"
 REPORT_FILE="${REPORT_FILE:-report.txt}"
 : > "$REPORT_FILE"
 
 # --- 1. Site uptime -----------------------------------------------------------
+# -L follows redirects. Without it this check reported SITE DOWN for two runs on
+# 2026-09-12, when the apex started 301-redirecting to www: curl returned
+# Cloudflare's redirect page, which does not contain "Cape Town Window".
 site_ok=true
-if ! curl -fsS --max-time 20 "$SITE_URL" | grep -q "Cape Town Window"; then
+if ! curl -fsSL --max-time 20 "$SITE_URL" | grep -q "Cape Town Window"; then
   sleep 5
-  if ! curl -fsS --max-time 20 "$SITE_URL" | grep -q "Cape Town Window"; then
+  if ! curl -fsSL --max-time 20 "$SITE_URL" | grep -q "Cape Town Window"; then
     site_ok=false
     echo "SITE DOWN: $SITE_URL did not return the app (checked twice)" >> "$REPORT_FILE"
   fi
+fi
+
+# --- 1b. Apex still redirects to the canonical host ----------------------------
+# Load-bearing for search: if the apex stops redirecting, the same site answers
+# on two addresses again and Google splits the ranking between them. Silent
+# otherwise, so check it here rather than find out months later.
+if [ "$site_ok" = true ]; then
+  apex_target=$(curl -fsS --max-time 20 -o /dev/null -w '%{redirect_url}' "$APEX_URL" 2>/dev/null || true)
+  case "$apex_target" in
+    https://www.capetownwindow.com*) ;;
+    *) echo "APEX NOT REDIRECTING: $APEX_URL should 301 to $SITE_URL but returned '${apex_target:-no redirect}'. Check Rules > Redirect Rules in Cloudflare." >> "$REPORT_FILE" ;;
+  esac
 fi
 
 # --- 2. Camera liveness (YouTube-aware: isLive, not URL reachability) ----------
