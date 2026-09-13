@@ -4,8 +4,10 @@ name: Auto-repoint dead cameras
 # under a new video ID. Finding the replacement is deterministic, so this job
 # does the lookup and opens a PR with the change.
 #
-# It deliberately does NOT merge. A third-party stream should not reach the
-# live site without a person looking at it first.
+# The PR merges itself only when every camera it changes was replaced by a
+# stream on the same channel with exactly the same title as the one that died
+# (owner decision, 2026-09-13). Anything else waits for a person, because a
+# machine cannot tell whether a renamed stream still shows the same place.
 
 on:
   schedule:
@@ -37,8 +39,10 @@ jobs:
           chmod +x scripts/auto-repoint.sh
           SUMMARY_FILE=repoint-summary.md scripts/auto-repoint.sh
 
-      - name: Open or update the repoint PR
+      - name: Open or update the repoint PR, and merge it if every change is a same-title restart
         if: steps.repoint.outputs.changed != '' && steps.repoint.outputs.changed != '0'
+        env:
+          AUTOMERGE: ${{ steps.repoint.outputs.automerge }}
         run: |
           set -eu
           git config user.name "github-actions[bot]"
@@ -61,23 +65,49 @@ jobs:
             echo
             cat repoint-summary.md
             echo
-            echo "### Before merging"
+            if [ "$AUTOMERGE" = "true" ]; then
+              echo "### Merged automatically"
+              echo
+              echo "Every change above is the same channel restarting a stream with exactly the same title,"
+              echo "which is the operator restarting the same camera. Worth a glance at the new IDs when you"
+              echo "next have a moment; revert this PR if a view has changed."
+            else
+              echo "### Before merging"
+              echo
+              echo "The Data API says these are live and embeddable, which is necessary but not sufficient."
+              echo "At least one change is not a same-title restart, so this PR waits for you. Open each new"
+              echo "ID once to confirm the view still matches the camera it is replacing."
+            fi
             echo
-            echo "The Data API says these are live and embeddable, which is necessary but not sufficient."
-            echo "It cannot tell you the camera is pointing where the name claims. Worth opening each new"
-            echo "ID once to confirm the view still matches the camera it is replacing."
-            echo
-            echo "_Opened by the auto-repoint workflow. Not auto-merged on purpose._"
+            echo "_Opened by the auto-repoint workflow._"
           } > pr-body.md
 
-          existing=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
-          if [ -n "$existing" ]; then
-            gh pr edit "$existing" --repo "$GITHUB_REPOSITORY" --body-file pr-body.md
-            echo "Updated existing repoint PR #$existing"
+          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$pr" ]; then
+            gh pr edit "$pr" --repo "$GITHUB_REPOSITORY" --body-file pr-body.md
+            echo "Updated existing repoint PR #$pr"
           else
             gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
               --title "Repoint dead cameras to their current live stream IDs" --body-file pr-body.md
-            echo "Opened repoint PR"
+            pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+            echo "Opened repoint PR #$pr"
+          fi
+
+          if [ "$AUTOMERGE" = "true" ] && [ -n "$pr" ]; then
+            # GitHub works out whether a new PR can merge a few seconds after it
+            # opens, so allow a few attempts. The branch is kept: the next run
+            # rebuilds it from main anyway.
+            merged=false
+            for attempt in 1 2 3 4 5; do
+              if gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --merge; then merged=true; break; fi
+              sleep 10
+            done
+            if [ "$merged" = "true" ]; then
+              echo "Merged PR #$pr automatically: every change was a same-title restart." >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "Could not merge PR #$pr automatically; it is open for review." >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
           fi
 
       - name: Report cameras that could not be repointed
