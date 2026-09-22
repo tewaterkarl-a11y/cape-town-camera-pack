@@ -12,11 +12,12 @@ name: Auto-repoint dead cameras
 on:
   schedule:
     - cron: "47 3,15 * * *" # twice daily, offset from the 6-hourly monitor
-  workflow_dispatch: {}
+  workflow_dispatch: {} # also started by the monitor as soon as it finds a dead camera
 
 permissions:
   contents: write
   pull-requests: write
+  actions: write # to re-run the monitor after a fix, so its alert issue closes
 
 concurrency:
   group: auto-repoint
@@ -104,6 +105,9 @@ jobs:
             done
             if [ "$merged" = "true" ]; then
               echo "Merged PR #$pr automatically: every change was a same-title restart." >> "$GITHUB_STEP_SUMMARY"
+              # Re-check straight away so the alert issue closes now rather than
+              # at the next scheduled monitor run.
+              gh workflow run monitor.yml --repo "$GITHUB_REPOSITORY" --ref main || true
             else
               echo "Could not merge PR #$pr automatically; it is open for review." >> "$GITHUB_STEP_SUMMARY"
               exit 1

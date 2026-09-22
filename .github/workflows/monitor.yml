@@ -8,6 +8,7 @@ on:
 permissions:
   issues: write
   contents: read
+  actions: write # to start the auto-repoint workflow when a camera is down
 
 concurrency:
   group: monitor
@@ -78,4 +79,16 @@ jobs:
             else
               echo "All healthy; nothing to do."
             fi
+          fi
+
+      # Waiting for auto-repoint's own schedule (twice daily, often hours late)
+      # left a dead camera down for up to ~17 hours. Start it now instead; it
+      # decides for itself whether a replacement exists and whether it may
+      # merge. It never starts the monitor back unless it merged a fix, so the
+      # two cannot loop.
+      - name: Start auto-repoint if a camera is down
+        run: |
+          if grep -q '^CAMERA ' report.txt 2>/dev/null; then
+            gh workflow run auto-repoint.yml --repo "$GITHUB_REPOSITORY" --ref main
+            echo "Camera problem found; started auto-repoint." >> "$GITHUB_STEP_SUMMARY"
           fi
