@@ -1,6 +1,6 @@
 {
   "version": "1.9",
-  "updated": "2026-09-27",
+  "updated": "2026-10-04",
   "cameras": [
     {
       "id": "seapoint-lions-head",
@@ -118,7 +118,7 @@
       "id": "table-mountain-lions-head",
       "name": "Table Mountain & Lion’s Head Panorama",
       "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/pFJuVEuBWWw",
+      "streamUrl": "https://www.youtube.com/embed/OVMNfpn1w4A",
       "enabled": true,
       "location": {
         "area": "City Bowl",
@@ -126,7 +126,7 @@
         "lng": null
       },
       "channelId": "UCMyCO_-D2eLocsvoiGob7iw",
-      "titleMatch": "Cape Town Live Stream Webcam"
+      "titleMatch": "Cape Town Live"
     }
   ]
 }
