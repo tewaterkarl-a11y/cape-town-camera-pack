@@ -1,14 +1,23 @@
 name: Monitor site and cameras
 
+# Three jobs, in order:
+#   check   - looks for a dead camera.
+#   repoint - only if one is dead: runs auto-repoint now, so a same-title
+#             restart is fixed before anyone is told about it.
+#   alert   - checks again from a fresh copy of main and opens, updates or
+#             closes the alert issue. A camera that auto-repoint fixed is
+#             therefore never reported (owner decision, 2026-10-04); one it
+#             could not fix still is.
+# Auto-repoint never starts this workflow when the monitor called it, so the
+# two cannot loop.
+
 on:
   schedule:
     - cron: "23 */6 * * *" # every 6 hours (GitHub cron is best-effort, not exact)
   workflow_dispatch: {}
 
 permissions:
-  issues: write
   contents: read
-  actions: write # to start the auto-repoint workflow when a camera is down
 
 concurrency:
   group: monitor
@@ -17,10 +26,55 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    outputs:
+      camera_problem: ${{ steps.camera.outputs.camera_problem }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run health checks
+        env:
+          YT_API_KEY: ${{ secrets.YT_API_KEY }}
+        run: |
+          chmod +x scripts/check.sh
+          REPORT_FILE=report.txt scripts/check.sh
+
+      - name: Note whether a camera is down
+        id: camera
+        run: |
+          if grep -q '^CAMERA ' report.txt; then
+            echo "camera_problem=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "camera_problem=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Waiting for auto-repoint's own schedule (twice daily, often hours late)
+  # left a dead camera down for up to ~17 hours, so run it now instead.
+  repoint:
+    needs: check
+    if: needs.check.outputs.camera_problem == 'true'
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    uses: ./.github/workflows/auto-repoint.yml
+    with:
+      from_monitor: true
+    secrets: inherit
+
+  alert:
+    needs: [check, repoint]
+    # Runs whether or not the repair ran or succeeded: a failed repair must
+    # still raise the alert.
+    if: ${{ always() && needs.check.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
     env:
       GH_TOKEN: ${{ github.token }}
       ISSUE_TITLE: "Monitor alert: site or camera problem detected"
     steps:
+      # A fresh checkout, so it sees any repair that was just committed to main.
       - uses: actions/checkout@v5
 
       - name: Run health checks
@@ -79,16 +133,4 @@ jobs:
             else
               echo "All healthy; nothing to do."
             fi
-          fi
-
-      # Waiting for auto-repoint's own schedule (twice daily, often hours late)
-      # left a dead camera down for up to ~17 hours. Start it now instead; it
-      # decides for itself whether a replacement exists and whether it may
-      # merge. It never starts the monitor back unless it merged a fix, so the
-      # two cannot loop.
-      - name: Start auto-repoint if a camera is down
-        run: |
-          if grep -q '^CAMERA ' report.txt 2>/dev/null; then
-            gh workflow run auto-repoint.yml --repo "$GITHUB_REPOSITORY" --ref main
-            echo "Camera problem found; started auto-repoint." >> "$GITHUB_STEP_SUMMARY"
           fi

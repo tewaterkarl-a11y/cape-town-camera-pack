@@ -2,22 +2,34 @@ name: Auto-repoint dead cameras
 
 # When a camera dies it is almost always the same physical camera restarted
 # under a new video ID. Finding the replacement is deterministic, so this job
-# does the lookup and opens a PR with the change.
+# does the lookup and writes the change.
 #
-# The PR merges itself only when every camera it changes was replaced by a
-# stream on the same channel with exactly the same title as the one that died
-# (owner decision, 2026-09-13). Anything else waits for a person, because a
-# machine cannot tell whether a renamed stream still shows the same place.
+# Same channel and exactly the same title as the stream that died is the
+# operator restarting the same camera (owner decision, 2026-09-13), so that
+# change is committed straight to main with no PR and no notification (owner
+# decision, 2026-10-04: a routine restart is not worth an email). Anything
+# else (a renamed stream, a deleted old video, a different channel, or a mix)
+# opens a PR and waits for a person, because a machine cannot tell whether a
+# renamed stream still shows the same place.
+#
+# Started three ways: the monitor calls it when it finds a dead camera, twice
+# a day on a schedule as a fallback, and by hand.
 
 on:
   schedule:
     - cron: "47 3,15 * * *" # twice daily, offset from the 6-hourly monitor
-  workflow_dispatch: {} # also started by the monitor as soon as it finds a dead camera
+  workflow_dispatch: {}
+  workflow_call:
+    inputs:
+      from_monitor:
+        description: "True when the monitor called this and will re-check the cameras itself"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
   pull-requests: write
-  actions: write # to re-run the monitor after a fix, so its alert issue closes
+  actions: write # to re-run the monitor after a standalone fix, so its alert issue closes
 
 concurrency:
   group: auto-repoint
@@ -40,10 +52,45 @@ jobs:
           chmod +x scripts/auto-repoint.sh
           SUMMARY_FILE=repoint-summary.md scripts/auto-repoint.sh
 
-      - name: Open or update the repoint PR, and merge it if every change is a same-title restart
-        if: steps.repoint.outputs.changed != '' && steps.repoint.outputs.changed != '0'
-        env:
-          AUTOMERGE: ${{ steps.repoint.outputs.automerge }}
+      # Same-title restart: no PR, no email. The commit message and the run
+      # summary are the record, and reverting the commit undoes it. Only ever
+      # from main, so a manual run on another branch cannot push to main.
+      - name: Commit same-title restarts straight to main
+        id: direct
+        if: steps.repoint.outputs.automerge == 'true' && github.ref == 'refs/heads/main'
+        run: |
+          set -eu
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cameras.json
+          git commit -m "Repoint dead cameras to their current live stream IDs
+
+          Same channel and exactly the same title as the stream that died, so
+          committed directly. Each replacement was confirmed live and
+          embeddable through the YouTube Data API.
+
+          $(cat repoint-summary.md)"
+          # main may have moved since checkout; rebase and retry rather than fail.
+          pushed=false
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then pushed=true; break; fi
+            git pull --rebase origin main
+          done
+          if [ "$pushed" != "true" ]; then
+            echo "Could not push the repoint to main; the change was not applied." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "Committed same-title restart(s) straight to main." >> "$GITHUB_STEP_SUMMARY"
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+      # When called by the monitor it re-checks the cameras itself straight
+      # afterwards, so only a standalone run needs to start it.
+      - name: Re-run the monitor so its alert issue closes
+        if: steps.direct.outputs.pushed == 'true' && inputs.from_monitor != true
+        run: gh workflow run monitor.yml --repo "$GITHUB_REPOSITORY" --ref main || true
+
+      - name: Open or update the repoint PR for changes that need a person
+        if: steps.repoint.outputs.changed != '' && steps.repoint.outputs.changed != '0' && steps.direct.outputs.pushed != 'true'
         run: |
           set -eu
           git config user.name "github-actions[bot]"
@@ -66,19 +113,11 @@ jobs:
             echo
             cat repoint-summary.md
             echo
-            if [ "$AUTOMERGE" = "true" ]; then
-              echo "### Merged automatically"
-              echo
-              echo "Every change above is the same channel restarting a stream with exactly the same title,"
-              echo "which is the operator restarting the same camera. Worth a glance at the new IDs when you"
-              echo "next have a moment; revert this PR if a view has changed."
-            else
-              echo "### Before merging"
-              echo
-              echo "The Data API says these are live and embeddable, which is necessary but not sufficient."
-              echo "At least one change is not a same-title restart, so this PR waits for you. Open each new"
-              echo "ID once to confirm the view still matches the camera it is replacing."
-            fi
+            echo "### Before merging"
+            echo
+            echo "The Data API says these are live and embeddable, which is necessary but not sufficient."
+            echo "At least one change is not a same-title restart, so this PR waits for you. Open each new"
+            echo "ID once to confirm the view still matches the camera it is replacing."
             echo
             echo "_Opened by the auto-repoint workflow._"
           } > pr-body.md
@@ -90,28 +129,6 @@ jobs:
           else
             gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
               --title "Repoint dead cameras to their current live stream IDs" --body-file pr-body.md
-            pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
-            echo "Opened repoint PR #$pr"
-          fi
-
-          if [ "$AUTOMERGE" = "true" ] && [ -n "$pr" ]; then
-            # GitHub works out whether a new PR can merge a few seconds after it
-            # opens, so allow a few attempts. The branch is kept: the next run
-            # rebuilds it from main anyway.
-            merged=false
-            for attempt in 1 2 3 4 5; do
-              if gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --merge; then merged=true; break; fi
-              sleep 10
-            done
-            if [ "$merged" = "true" ]; then
-              echo "Merged PR #$pr automatically: every change was a same-title restart." >> "$GITHUB_STEP_SUMMARY"
-              # Re-check straight away so the alert issue closes now rather than
-              # at the next scheduled monitor run.
-              gh workflow run monitor.yml --repo "$GITHUB_REPOSITORY" --ref main || true
-            else
-              echo "Could not merge PR #$pr automatically; it is open for review." >> "$GITHUB_STEP_SUMMARY"
-              exit 1
-            fi
           fi
 
       - name: Report cameras that could not be repointed
