@@ -126,7 +126,8 @@
         "lng": null
       },
       "channelId": "UCMyCO_-D2eLocsvoiGob7iw",
-      "titleMatch": "Cape Town Live"
+      "titleMatch": "Cape Town Live",
+      "trustChannel": true
     }
   ]
 }
