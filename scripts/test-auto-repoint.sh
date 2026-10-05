@@ -120,6 +120,55 @@ expect "nothing changed" "$CHANGED" 0
 expect "automerge not allowed" "$AUTOMERGE" false
 expect "stream URL untouched" "$(URL_OF sea-point)" "https://www.youtube.com/embed/OLDaaaaaaaa"
 
+CAM_T='{"id":"table-mountain","name":"Table Mountain","type":"youtube","streamUrl":"https://www.youtube.com/embed/OLDtttttttt","enabled":true,"channelId":"UCflooring","titleMatch":"Cape Town Live","trustChannel":true}'
+
+echo "trustChannel, title changed: repoint and allow the merge"
+setup "[$CAM_T]"
+echo "{\"items\":[$(video OLDtttttttt 'Table Mountain Morning | 4 Oct 2026 | LIVE REPLAY' none true UCflooring)]}" > "$FIXTURES/videos.json"
+echo '{"items":[{"id":{"videoId":"NEWtttttttt"},"snippet":{"title":"Cape Town Live Cam at Night"}}]}' > "$FIXTURES/search.json"
+echo "{\"items\":[$(video NEWtttttttt 'Cape Town Live Cam at Night' live true UCflooring)]}" > "$FIXTURES/video-NEWtttttttt.json"
+run_case
+expect "one camera changed" "$CHANGED" 1
+expect "automerge allowed" "$AUTOMERGE" true
+expect "stream URL rewritten" "$(URL_OF table-mountain)" "https://www.youtube.com/embed/NEWtttttttt"
+expect "summary names trustChannel" "$(grep -c 'trustChannel' "$WORK/summary.md")" 1
+
+echo "trustChannel, old video deleted: still allowed (same channel, only match)"
+setup "[$CAM_T]"
+echo '{"items":[]}' > "$FIXTURES/videos.json"
+echo '{"items":[{"id":{"videoId":"NEWtttttttt"},"snippet":{"title":"Cape Town Live Cam at Night"}}]}' > "$FIXTURES/search.json"
+echo "{\"items\":[$(video NEWtttttttt 'Cape Town Live Cam at Night' live true UCflooring)]}" > "$FIXTURES/video-NEWtttttttt.json"
+run_case
+expect "one camera changed" "$CHANGED" 1
+expect "automerge allowed" "$AUTOMERGE" true
+
+echo "trustChannel, candidate on a different channel: wait for a person"
+setup "[$CAM_T]"
+echo "{\"items\":[$(video OLDtttttttt 'Cape Town Live Cam' none true UCflooring)]}" > "$FIXTURES/videos.json"
+echo '{"items":[{"id":{"videoId":"NEWtttttttt"},"snippet":{"title":"Cape Town Live Cam"}}]}' > "$FIXTURES/search.json"
+echo "{\"items\":[$(video NEWtttttttt 'Cape Town Live Cam' live true UCsomeoneelse)]}" > "$FIXTURES/video-NEWtttttttt.json"
+run_case
+expect "automerge refused" "$AUTOMERGE" false
+
+echo "trustChannel, two live streams match: not guessing"
+setup "[$CAM_T]"
+echo "{\"items\":[$(video OLDtttttttt 'Cape Town Live Cam' none true UCflooring)]}" > "$FIXTURES/videos.json"
+echo '{"items":[{"id":{"videoId":"NEWtttttttt"},"snippet":{"title":"Cape Town Live Cam"}},{"id":{"videoId":"NEWuuuuuuuu"},"snippet":{"title":"Cape Town Live Harbour"}}]}' > "$FIXTURES/search.json"
+run_case
+expect "nothing changed" "$CHANGED" 0
+expect "automerge not allowed" "$AUTOMERGE" false
+expect "summary says ambiguous" "$(grep -c 'ambiguous' "$WORK/summary.md")" 1
+
+echo "trustChannel on one camera does not cover another: the whole run waits"
+setup "[$CAM_T,$CAM_A]"
+echo "{\"items\":[$(video OLDtttttttt 'Old title' none true UCflooring),$(video OLDaaaaaaaa 'Sea Point Live' none true UCvanilla)]}" > "$FIXTURES/videos.json"
+echo '{"items":[{"id":{"videoId":"NEWtttttttt"},"snippet":{"title":"Cape Town Live Cam"}},{"id":{"videoId":"NEWaaaaaaaa"},"snippet":{"title":"Sea Point Live 2"}}]}' > "$FIXTURES/search.json"
+echo "{\"items\":[$(video NEWtttttttt 'Cape Town Live Cam' live true UCflooring)]}" > "$FIXTURES/video-NEWtttttttt.json"
+echo "{\"items\":[$(video NEWaaaaaaaa 'Sea Point Live 2' live true UCvanilla)]}" > "$FIXTURES/video-NEWaaaaaaaa.json"
+run_case
+expect "two cameras changed" "$CHANGED" 2
+expect "automerge refused" "$AUTOMERGE" false
+
 echo "All cameras healthy: nothing to do"
 setup "[$CAM_A]"
 echo "{\"items\":[$(video OLDaaaaaaaa 'Sea Point Live' live true UCvanilla)]}" > "$FIXTURES/videos.json"

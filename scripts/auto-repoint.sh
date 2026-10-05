@@ -15,6 +15,13 @@
 # restarting the same camera. Anything else (a renamed stream, a deleted old
 # video whose title cannot be compared) waits for a person to check the view.
 #
+# Per-camera exception (owner decision, 2026-10-05): a camera with
+# "trustChannel": true may also apply itself when the replacement is on the
+# same channel and is the only live stream there matching its titleMatch,
+# whatever its exact title. For operators who retitle every stream (the Table
+# Mountain & Lion's Head operator renames each one after it ends and uses
+# different day and night titles). More than one match still refuses.
+#
 # Writes a markdown summary to $SUMMARY_FILE and edits cameras.json in place.
 # Sets `changed=<n>` and `automerge=true|false` in $GITHUB_OUTPUT.
 # Exits 0 whether or not it found anything; the workflow decides what to do.
@@ -44,7 +51,7 @@ fi
 api() { curl -fsS --max-time 20 "$1" 2>/dev/null; }
 
 # --- 1. Which enabled cameras are currently broken? ---------------------------
-mapfile -t rows < <(jq -r '.cameras[] | select(.enabled) | [.id, .name, .streamUrl, (.channelId // ""), (.titleMatch // "")] | @tsv' cameras.json)
+mapfile -t rows < <(jq -r '.cameras[] | select(.enabled) | [.id, .name, .streamUrl, (.channelId // ""), (.titleMatch // ""), (.trustChannel == true)] | @tsv' cameras.json)
 [ "${#rows[@]}" -eq 0 ] && { echo "No enabled cameras." >&2; finish; }
 
 ids=""
@@ -63,6 +70,7 @@ for row in "${rows[@]}"; do
   vid=$(echo "$row" | cut -f3 | sed -E 's#.*/embed/([A-Za-z0-9_-]{11}).*#\1#')
   channel=$(echo "$row" | cut -f4)
   match=$(echo "$row" | cut -f5)
+  trust=$(echo "$row" | cut -f6)
 
   state=$(echo "$resp" | jq -r --arg v "$vid" '.items[] | select(.id == $v) | .snippet.liveBroadcastContent // empty')
   embeddable=$(echo "$resp" | jq -r --arg v "$vid" '.items[] | select(.id == $v) | .status.embeddable // empty')
@@ -137,6 +145,9 @@ for row in "${rows[@]}"; do
   # send the change to a person.
   if [ -n "$old_title" ] && [ "$old_title" = "$new_title" ] && [ "$new_channel" = "$channel" ]; then
     verdict="Same channel and exactly the same title as the stream that died, so this change may merge itself."
+  elif [ "$trust" = "true" ] && [ "$new_channel" = "$channel" ]; then
+    # Uniqueness is already guaranteed: more than one match stopped above.
+    verdict="Same channel and the only live stream matching \`${match}\`, and this camera has \`trustChannel\`, so this change may merge itself."
   else
     NEEDS_REVIEW=$((NEEDS_REVIEW + 1))
     if [ -z "$old_title" ]; then
