@@ -13,7 +13,10 @@ name: Monitor site and cameras
 
 on:
   schedule:
-    - cron: "23 */6 * * *" # every 6 hours (GitHub cron is best-effort, not exact)
+    # Hourly (GitHub cron is best-effort, not exact). Every 6 hours left an
+    # ended stream's recording playing for up to ~4 hours; a healthy check
+    # costs 1 YouTube API unit, so hourly is cheap.
+    - cron: "23 * * * *"
   workflow_dispatch: {}
 
 permissions:
@@ -74,8 +77,13 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       ISSUE_TITLE: "Monitor alert: site or camera problem detected"
     steps:
-      # A fresh checkout, so it sees any repair that was just committed to main.
+      # Check out main as it is now, so it sees a repair committed moments ago
+      # by the repoint job. Without `ref`, checkout uses the commit the run
+      # started on, and the alert reported "still dead" seconds after every
+      # successful repair (2026-10-06 to 10-09).
       - uses: actions/checkout@v5
+        with:
+          ref: main
 
       - name: Run health checks
         env:
@@ -119,8 +127,18 @@ jobs:
             } > body.md
 
             if [ -n "$existing" ]; then
-              gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file body.md
-              echo "Updated existing alert issue #$existing"
+              # Hourly checks would otherwise email the same problem every
+              # hour. Comment only when the list of problems has changed
+              # since the issue's latest post.
+              last=$(gh issue view "$existing" --repo "$GITHUB_REPOSITORY" --json body,comments \
+                --jq 'if (.comments | length) > 0 then .comments[-1].body else .body end' | grep '^- ' | sort)
+              now=$(sed 's/^/- /' report.txt | sort)
+              if [ "$last" = "$now" ]; then
+                echo "Alert issue #$existing already lists these problems; not commenting again."
+              else
+                gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file body.md
+                echo "Updated existing alert issue #$existing"
+              fi
             else
               gh issue create --repo "$GITHUB_REPOSITORY" --title "$ISSUE_TITLE" --body-file body.md
               echo "Opened new alert issue"

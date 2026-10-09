@@ -99,17 +99,36 @@ for row in "${rows[@]}"; do
   # A channel can run several cameras (Vanilla runs three), so filter the live
   # results by the camera's own titleMatch rather than taking the first hit.
   search=$(api "https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channel}&eventType=live&type=video&maxResults=25&key=${YT_API_KEY}")
-  if [ -z "$search" ]; then
-    printf -- '- **%s** (`%s`): %s. Channel search failed this run; will retry.\n' "$name" "$id" "$reason" >> "$SUMMARY_FILE"
-    continue
+  hits=()
+  recent_ids=""
+  if [ -n "$search" ]; then
+    mapfile -t hits < <(echo "$search" | jq -r --arg m "$match" \
+      '.items[] | select(.snippet.title | ascii_downcase | contains($m | ascii_downcase)) | [.id.videoId, .snippet.title] | @tsv')
   fi
 
-  mapfile -t hits < <(echo "$search" | jq -r --arg m "$match" \
-    '.items[] | select(.snippet.title | ascii_downcase | contains($m | ascii_downcase)) | [.id.videoId, .snippet.title] | @tsv')
+  # Search results are cached and can miss a stream that has been live for
+  # hours: on 2026-10-08 it found nothing four times in a row while the
+  # replacement was live, so the site kept playing the ended stream's
+  # recording overnight. The channel's uploads playlist is not cached that
+  # way, so when search finds nothing, look at its newest entries too. Same
+  # titleMatch rule; 2 quota units instead of search's 100.
+  if [ "${#hits[@]}" -eq 0 ]; then
+    recent=$(api "https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=UU${channel#UC}&maxResults=10&key=${YT_API_KEY}")
+    recent_ids=$(echo "$recent" | jq -r '[.items[]?.contentDetails.videoId] | join(",")' 2>/dev/null)
+    if [ -n "$recent_ids" ]; then
+      details=$(api "https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${recent_ids}&key=${YT_API_KEY}")
+      mapfile -t hits < <(echo "$details" | jq -r --arg m "$match" \
+        '.items[]? | select(.snippet.liveBroadcastContent == "live") | select(.snippet.title | ascii_downcase | contains($m | ascii_downcase)) | [.id, .snippet.title] | @tsv')
+    fi
+  fi
 
   if [ "${#hits[@]}" -eq 0 ]; then
-    printf -- '- **%s** (`%s`): %s. No live stream on the channel matching `%s`. The camera may be genuinely gone.\n' \
-      "$name" "$id" "$reason" "$match" >> "$SUMMARY_FILE"
+    if [ -z "$search" ] && [ -z "$recent_ids" ]; then
+      printf -- '- **%s** (`%s`): %s. Channel search and the uploads lookup both failed this run; will retry.\n' "$name" "$id" "$reason" >> "$SUMMARY_FILE"
+    else
+      printf -- '- **%s** (`%s`): %s. No live stream on the channel matching `%s` (checked search and the channel'"'"'s newest uploads). The camera may be genuinely gone.\n' \
+        "$name" "$id" "$reason" "$match" >> "$SUMMARY_FILE"
+    fi
     continue
   fi
   if [ "${#hits[@]}" -gt 1 ]; then
