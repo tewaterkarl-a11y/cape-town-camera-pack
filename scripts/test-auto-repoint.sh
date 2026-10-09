@@ -12,6 +12,7 @@ FAILURES=0
 # A fake curl that answers from $FIXTURES instead of the network.
 # videos?...&id=<one id> -> video-<id>.json if present, else videos.json
 # search?...             -> search.json
+# playlistItems?...      -> playlist.json if present, else a failed request
 make_fake_curl() {
   mkdir -p "$1"
   cat > "$1/curl" <<'EOF'
@@ -19,6 +20,8 @@ make_fake_curl() {
 url="${@: -1}"
 case "$url" in
   *"/search?"*) cat "$FIXTURES/search.json" ;;
+  *"/playlistItems?"*)
+    if [ -f "$FIXTURES/playlist.json" ]; then cat "$FIXTURES/playlist.json"; else exit 22; fi ;;
   *"/videos?"*)
     id=$(echo "$url" | sed -E 's#.*[?&]id=([^&]+).*#\1#')
     if [ -f "$FIXTURES/video-$id.json" ]; then cat "$FIXTURES/video-$id.json"; else cat "$FIXTURES/videos.json"; fi ;;
@@ -168,6 +171,37 @@ echo "{\"items\":[$(video NEWaaaaaaaa 'Sea Point Live 2' live true UCvanilla)]}"
 run_case
 expect "two cameras changed" "$CHANGED" 2
 expect "automerge refused" "$AUTOMERGE" false
+
+echo "Search misses the live stream, the uploads playlist finds it"
+setup "[$CAM_T]"
+echo "{\"items\":[$(video OLDtttttttt 'Golden Hour | 8 Oct 2026 | LIVE REPLAY' none true UCflooring)]}" > "$FIXTURES/videos.json"
+echo '{"items":[]}' > "$FIXTURES/search.json"
+echo '{"items":[{"contentDetails":{"videoId":"NEWtttttttt"}},{"contentDetails":{"videoId":"OLDtttttttt"}}]}' > "$FIXTURES/playlist.json"
+echo "{\"items\":[$(video NEWtttttttt 'Cape Town Live Cam at Night' live true UCflooring),$(video OLDtttttttt 'Golden Hour | 8 Oct 2026 | LIVE REPLAY' none true UCflooring)]}" > "$FIXTURES/video-NEWtttttttt,OLDtttttttt.json"
+echo "{\"items\":[$(video NEWtttttttt 'Cape Town Live Cam at Night' live true UCflooring)]}" > "$FIXTURES/video-NEWtttttttt.json"
+run_case
+expect "one camera changed" "$CHANGED" 1
+expect "automerge allowed" "$AUTOMERGE" true
+expect "stream URL rewritten" "$(URL_OF table-mountain)" "https://www.youtube.com/embed/NEWtttttttt"
+
+echo "Uploads only has yesterday's ended stream: never picked"
+setup "[$CAM_T]"
+echo "{\"items\":[$(video OLDtttttttt 'Cape Town Live Cam 24/7' none true UCflooring)]}" > "$FIXTURES/videos.json"
+echo '{"items":[]}' > "$FIXTURES/search.json"
+echo '{"items":[{"contentDetails":{"videoId":"YESTERDAYyy"}}]}' > "$FIXTURES/playlist.json"
+echo "{\"items\":[$(video YESTERDAYyy 'Cape Town Live Cam 24/7 | 8 Oct 2026 | LIVE REPLAY' none true UCflooring)]}" > "$FIXTURES/video-YESTERDAYyy.json"
+run_case
+expect "nothing changed" "$CHANGED" 0
+expect "stream URL untouched" "$(URL_OF table-mountain)" "https://www.youtube.com/embed/OLDtttttttt"
+expect "summary says no live match" "$(grep -c 'No live stream on the channel matching' "$WORK/summary.md")" 1
+
+echo "Search and uploads both fail: retry later, change nothing"
+setup "[$CAM_T]"
+echo "{\"items\":[$(video OLDtttttttt 'Cape Town Live Cam' none true UCflooring)]}" > "$FIXTURES/videos.json"
+echo '' > "$FIXTURES/search.json"
+run_case
+expect "nothing changed" "$CHANGED" 0
+expect "summary says both failed" "$(grep -c 'both failed' "$WORK/summary.md")" 1
 
 echo "All cameras healthy: nothing to do"
 setup "[$CAM_A]"

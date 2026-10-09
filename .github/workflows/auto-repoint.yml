@@ -17,7 +17,7 @@ name: Auto-repoint dead cameras
 
 on:
   schedule:
-    - cron: "47 3,15 * * *" # twice daily, offset from the 6-hourly monitor
+    - cron: "47 3,15 * * *" # twice daily fallback; the hourly monitor normally runs it first
   workflow_dispatch: {}
   workflow_call:
     inputs:
@@ -137,6 +137,9 @@ jobs:
           if [ -s repoint-summary.md ]; then
             echo "## Auto-repoint summary" >> "$GITHUB_STEP_SUMMARY"
             cat repoint-summary.md >> "$GITHUB_STEP_SUMMARY"
+            # Also in the log: the step summary is only visible when signed
+            # in, and the log is what the gh CLI can read.
+            cat repoint-summary.md
           else
             echo "All enabled cameras healthy; nothing to repoint." >> "$GITHUB_STEP_SUMMARY"
           fi
