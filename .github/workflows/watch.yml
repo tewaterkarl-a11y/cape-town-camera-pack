@@ -1,0 +1,70 @@
+name: Watch cameras between monitor runs
+
+# GitHub does not keep to the monitor's hourly schedule. From 12 to 15
+# October it started the monitor every 3 to 8 hours, never hourly. On
+# 2026-10-15 the 07:34 UTC run found Table Mountain & Lion's Head live, the
+# stream ended soon after, and with no run for hours the site played the
+# ended stream's recording all morning.
+#
+# This job does not rely on the schedule's timing. Whenever GitHub starts it,
+# it stays up for close to the 6-hour job limit and runs the same health
+# check every 10 minutes from a fresh copy of main. When the check finds a
+# problem it starts the monitor, which repairs and alerts exactly as before.
+# A run that starts while one is still going waits for it, so they hand over
+# with little or no gap.
+#
+# Cost: one YouTube Data API unit per check (about 150 a day of the 10,000
+# daily quota). The monitor, whose repair search costs 100 units, is started
+# at most once an hour while a problem lasts. Actions minutes are free for
+# public repositories.
+
+on:
+  schedule:
+    - cron: "11 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: write # to start the monitor
+
+concurrency:
+  group: watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      GH_TOKEN: ${{ github.token }}
+      YT_API_KEY: ${{ secrets.YT_API_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Check every 10 minutes and start the monitor on a problem
+        run: |
+          set -u
+          chmod +x scripts/check.sh
+          stop_at=$((SECONDS + 345 * 60))
+          last_start=-3600
+          while [ "$SECONDS" -lt "$stop_at" ]; do
+            # A repair commits to main, so check the camera list as it is now.
+            if git fetch -q --depth 1 origin main; then
+              git reset -q --hard FETCH_HEAD
+            fi
+            REPORT_FILE=report.txt scripts/check.sh || true
+            if [ -s report.txt ]; then
+              echo "$(date -u '+%H:%M') problem found:"; cat report.txt
+              if [ $((SECONDS - last_start)) -ge 3600 ]; then
+                if gh workflow run monitor.yml --repo "$GITHUB_REPOSITORY" --ref main; then
+                  last_start=$SECONDS
+                  echo "Started the monitor to repair and alert."
+                fi
+              else
+                echo "Monitor already started within the hour; not starting it again."
+              fi
+            fi
+            sleep 600
+          done

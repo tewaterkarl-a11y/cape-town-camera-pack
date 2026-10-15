@@ -60,8 +60,19 @@ for row in "${rows[@]}"; do
   ids="${ids:+$ids,}$vid"
 done
 
-resp=$(api "https://www.googleapis.com/youtube/v3/videos?part=snippet,status&id=${ids}&key=${YT_API_KEY}")
+# liveStreamingDetails costs nothing extra and is the only field that says a
+# stream has ended for certain: actualEndTime appears the moment it stops.
+resp=$(api "https://www.googleapis.com/youtube/v3/videos?part=snippet,status,liveStreamingDetails&id=${ids}&key=${YT_API_KEY}")
 [ -z "$resp" ] && { echo "YouTube Data API call failed; skipping this run." >&2; finish; }
+
+# A stream is only worth showing while it is live now: liveBroadcastContent is
+# "live", there is no actualEndTime, and the title does not call it a replay.
+# The Table Mountain & Lion's Head operator renames an ended stream to
+# "... | LIVE REPLAY", which still contains its titleMatch.
+# Used for the current stream and for every candidate, so both sides agree.
+LIVE_NOW='(.snippet.liveBroadcastContent == "live")
+  and ((.liveStreamingDetails.actualEndTime // "") == "")
+  and ((.snippet.title // "") | ascii_downcase | contains("replay") | not)'
 
 # --- 2. For each broken one, find its channel's current live stream -----------
 for row in "${rows[@]}"; do
@@ -72,12 +83,16 @@ for row in "${rows[@]}"; do
   match=$(echo "$row" | cut -f5)
   trust=$(echo "$row" | cut -f6)
 
-  state=$(echo "$resp" | jq -r --arg v "$vid" '.items[] | select(.id == $v) | .snippet.liveBroadcastContent // empty')
-  embeddable=$(echo "$resp" | jq -r --arg v "$vid" '.items[] | select(.id == $v) | .status.embeddable // empty')
-  old_title=$(echo "$resp" | jq -r --arg v "$vid" '.items[] | select(.id == $v) | .snippet.title // empty')
+  old=$(echo "$resp" | jq -c --arg v "$vid" 'first(.items[] | select(.id == $v)) // empty')
+  state=$(echo "$old" | jq -r '.snippet.liveBroadcastContent // empty' 2>/dev/null)
+  embeddable=$(echo "$old" | jq -r '.status.embeddable // empty' 2>/dev/null)
+  old_title=$(echo "$old" | jq -r '.snippet.title // empty' 2>/dev/null)
+  old_end=$(echo "$old" | jq -r '.liveStreamingDetails.actualEndTime // empty' 2>/dev/null)
+  old_start=$(echo "$old" | jq -r '.liveStreamingDetails.actualStartTime // empty' 2>/dev/null)
+  live_now=$(echo "$old" | jq -r "if . == null then false else ${LIVE_NOW} end" 2>/dev/null)
 
-  # Healthy: live and embeddable. Leave it alone.
-  if [ "$state" = "live" ] && [ "$embeddable" = "true" ]; then
+  # Healthy: live now and embeddable. Leave it alone.
+  if [ "$live_now" = "true" ] && [ "$embeddable" = "true" ]; then
     continue
   fi
 
@@ -85,6 +100,10 @@ for row in "${rows[@]}"; do
     reason="video no longer exists or is private"
   elif [ "$state" != "live" ]; then
     reason="stream ended (liveBroadcastContent=${state})"
+  elif [ -n "$old_end" ]; then
+    reason="stream ended at ${old_end} (liveBroadcastContent still said live)"
+  elif [ "$live_now" != "true" ]; then
+    reason="stream is a replay (\"${old_title}\")"
   else
     reason="live but the owner disabled embedding"
   fi
@@ -95,40 +114,55 @@ for row in "${rows[@]}"; do
     continue
   fi
 
+  # Candidates come from two places, and neither is trusted on its own.
   # search costs 100 quota units, so it only runs for cameras that are broken.
-  # A channel can run several cameras (Vanilla runs three), so filter the live
-  # results by the camera's own titleMatch rather than taking the first hit.
+  # Its results are cached: on 2026-10-08 it missed a stream live for hours,
+  # and it can still list a stream that has ended. The channel's uploads
+  # playlist (2 units) is not cached that way, so its newest entries are always
+  # added. A channel can run several cameras (Vanilla runs three), so only
+  # titles matching the camera's own titleMatch count.
   search=$(api "https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channel}&eventType=live&type=video&maxResults=25&key=${YT_API_KEY}")
-  hits=()
-  recent_ids=""
+  search_ids=""
   if [ -n "$search" ]; then
-    mapfile -t hits < <(echo "$search" | jq -r --arg m "$match" \
-      '.items[] | select(.snippet.title | ascii_downcase | contains($m | ascii_downcase)) | [.id.videoId, .snippet.title] | @tsv')
+    search_ids=$(echo "$search" | jq -r --arg m "$match" \
+      '[.items[]? | select(.snippet.title | ascii_downcase | contains($m | ascii_downcase)) | .id.videoId] | join(",")' 2>/dev/null)
+  fi
+  recent=$(api "https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=UU${channel#UC}&maxResults=10&key=${YT_API_KEY}")
+  recent_ids=$(echo "$recent" | jq -r '[.items[]?.contentDetails.videoId] | join(",")' 2>/dev/null)
+
+  if [ -z "$search" ] && [ -z "$recent_ids" ]; then
+    printf -- '- **%s** (`%s`): %s. Channel search and the uploads lookup both failed this run; will retry.\n' "$name" "$id" "$reason" >> "$SUMMARY_FILE"
+    continue
   fi
 
-  # Search results are cached and can miss a stream that has been live for
-  # hours: on 2026-10-08 it found nothing four times in a row while the
-  # replacement was live, so the site kept playing the ended stream's
-  # recording overnight. The channel's uploads playlist is not cached that
-  # way, so when search finds nothing, look at its newest entries too. Same
-  # titleMatch rule; 2 quota units instead of search's 100.
-  if [ "${#hits[@]}" -eq 0 ]; then
-    recent=$(api "https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=UU${channel#UC}&maxResults=10&key=${YT_API_KEY}")
-    recent_ids=$(echo "$recent" | jq -r '[.items[]?.contentDetails.videoId] | join(",")' 2>/dev/null)
-    if [ -n "$recent_ids" ]; then
-      details=$(api "https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${recent_ids}&key=${YT_API_KEY}")
-      mapfile -t hits < <(echo "$details" | jq -r --arg m "$match" \
-        '.items[]? | select(.snippet.liveBroadcastContent == "live") | select(.snippet.title | ascii_downcase | contains($m | ascii_downcase)) | [.id, .snippet.title] | @tsv')
-    fi
+  # Every candidate is confirmed directly before it counts, so a stale search
+  # hit can neither be picked nor make a real replacement look ambiguous.
+  cand_ids=$(printf '%s\n' "$search_ids" "$recent_ids" | tr ',' '\n' | grep -v '^$' | grep -vxF "$vid" | awk '!seen[$0]++' | paste -sd, -)
+  hits=()
+  rejected=""
+  if [ -n "$cand_ids" ]; then
+    details=$(api "https://www.googleapis.com/youtube/v3/videos?part=snippet,status,liveStreamingDetails&id=${cand_ids}&key=${YT_API_KEY}")
+    # Never move a camera to a stream that started before the one it replaces:
+    # that is an older broadcast, not the operator's restart.
+    mapfile -t hits < <(echo "$details" | jq -r --arg m "$match" --arg since "$old_start" \
+      ".items[]? | select(.snippet.title | ascii_downcase | contains(\$m | ascii_downcase))
+        | select(${LIVE_NOW})
+        | select(\$since == \"\" or (.liveStreamingDetails.actualStartTime // \"\") > \$since)
+        | [.id, .snippet.title] | @tsv" 2>/dev/null)
+    rejected=$(echo "$details" | jq -r --arg m "$match" --arg since "$old_start" \
+      "[.items[]? | select(.snippet.title | ascii_downcase | contains(\$m | ascii_downcase))
+        | select((${LIVE_NOW}) and (\$since == \"\" or (.liveStreamingDetails.actualStartTime // \"\") > \$since) | not)
+        | \"\`\" + .id + \"\` (\" + (if .liveStreamingDetails.actualEndTime then \"ended\"
+            elif .snippet.liveBroadcastContent != \"live\" then \"not live\"
+            elif (.snippet.title | ascii_downcase | contains(\"replay\")) then \"replay\"
+            else \"started before the current stream\" end) + \")\"] | join(\", \")" 2>/dev/null)
   fi
+  ignored=""
+  [ -n "$rejected" ] && ignored=" Ignored: ${rejected}."
 
   if [ "${#hits[@]}" -eq 0 ]; then
-    if [ -z "$search" ] && [ -z "$recent_ids" ]; then
-      printf -- '- **%s** (`%s`): %s. Channel search and the uploads lookup both failed this run; will retry.\n' "$name" "$id" "$reason" >> "$SUMMARY_FILE"
-    else
-      printf -- '- **%s** (`%s`): %s. No live stream on the channel matching `%s` (checked search and the channel'"'"'s newest uploads). The camera may be genuinely gone.\n' \
-        "$name" "$id" "$reason" "$match" >> "$SUMMARY_FILE"
-    fi
+    printf -- '- **%s** (`%s`): %s. No live stream on the channel matching `%s` (checked search and the channel'"'"'s newest uploads).%s The camera may be genuinely gone.\n' \
+      "$name" "$id" "$reason" "$match" "$ignored" >> "$SUMMARY_FILE"
     continue
   fi
   if [ "${#hits[@]}" -gt 1 ]; then
@@ -138,19 +172,16 @@ for row in "${rows[@]}"; do
   fi
 
   new_vid=$(echo "${hits[0]}" | cut -f1)
+  check=$(echo "$details" | jq -c --arg v "$new_vid" 'first(.items[] | select(.id == $v))')
+  new_embed=$(echo "$check" | jq -r '.status.embeddable // empty')
+  new_title=$(echo "$check" | jq -r '.snippet.title // empty')
+  new_channel=$(echo "$check" | jq -r '.snippet.channelId // empty')
 
-  # search results can lag reality, so confirm the candidate directly before
-  # proposing it. Embeddable matters as much as live: a stream that plays on
-  # YouTube but refuses to embed is the exact trap that disabled three cameras.
-  check=$(api "https://www.googleapis.com/youtube/v3/videos?part=snippet,status&id=${new_vid}&key=${YT_API_KEY}")
-  new_state=$(echo "$check" | jq -r '.items[0].snippet.liveBroadcastContent // empty')
-  new_embed=$(echo "$check" | jq -r '.items[0].status.embeddable // empty')
-  new_title=$(echo "$check" | jq -r '.items[0].snippet.title // empty')
-  new_channel=$(echo "$check" | jq -r '.items[0].snippet.channelId // empty')
-
-  if [ "$new_state" != "live" ] || [ "$new_embed" != "true" ]; then
-    printf -- '- **%s** (`%s`): %s. Candidate `%s` rejected (live=%s, embeddable=%s).\n' \
-      "$name" "$id" "$reason" "$new_vid" "${new_state:-missing}" "${new_embed:-missing}" >> "$SUMMARY_FILE"
+  # Embeddable matters as much as live: a stream that plays on YouTube but
+  # refuses to embed is the exact trap that disabled three cameras.
+  if [ "$new_embed" != "true" ]; then
+    printf -- '- **%s** (`%s`): %s. Candidate `%s` rejected (live=live, embeddable=%s).\n' \
+      "$name" "$id" "$reason" "$new_vid" "${new_embed:-missing}" >> "$SUMMARY_FILE"
     continue
   fi
 

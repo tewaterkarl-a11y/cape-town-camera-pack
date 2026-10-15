@@ -31,8 +31,13 @@ EOF
   chmod +x "$1/curl"
 }
 
-video() { # id title state embeddable channel
-  printf '{"id":"%s","snippet":{"title":"%s","liveBroadcastContent":"%s","channelId":"%s"},"status":{"embeddable":%s}}' "$1" "$2" "$3" "$5" "$4"
+video() { # id title state embeddable channel [actualStartTime] [actualEndTime]
+  local live='{}'
+  if [ -n "${6:-}" ] || [ -n "${7:-}" ]; then
+    live=$(jq -cn --arg s "${6:-}" --arg e "${7:-}" \
+      '{} + (if $s != "" then {actualStartTime: $s} else {} end) + (if $e != "" then {actualEndTime: $e} else {} end)')
+  fi
+  printf '{"id":"%s","snippet":{"title":"%s","liveBroadcastContent":"%s","channelId":"%s"},"status":{"embeddable":%s},"liveStreamingDetails":%s}' "$1" "$2" "$3" "$5" "$4" "$live"
 }
 
 # run_case <name> ; expects $WORK prepared with cameras.json and $FIXTURES
@@ -157,6 +162,7 @@ echo "trustChannel, two live streams match: not guessing"
 setup "[$CAM_T]"
 echo "{\"items\":[$(video OLDtttttttt 'Cape Town Live Cam' none true UCflooring)]}" > "$FIXTURES/videos.json"
 echo '{"items":[{"id":{"videoId":"NEWtttttttt"},"snippet":{"title":"Cape Town Live Cam"}},{"id":{"videoId":"NEWuuuuuuuu"},"snippet":{"title":"Cape Town Live Harbour"}}]}' > "$FIXTURES/search.json"
+echo "{\"items\":[$(video NEWtttttttt 'Cape Town Live Cam' live true UCflooring),$(video NEWuuuuuuuu 'Cape Town Live Harbour' live true UCflooring)]}" > "$FIXTURES/video-NEWtttttttt,NEWuuuuuuuu.json"
 run_case
 expect "nothing changed" "$CHANGED" 0
 expect "automerge not allowed" "$AUTOMERGE" false
@@ -194,6 +200,63 @@ run_case
 expect "nothing changed" "$CHANGED" 0
 expect "stream URL untouched" "$(URL_OF table-mountain)" "https://www.youtube.com/embed/OLDtttttttt"
 expect "summary says no live match" "$(grep -c 'No live stream on the channel matching' "$WORK/summary.md")" 1
+
+# --- 2026-10-15: the camera showed yesterday's stream ------------------------
+# liveBroadcastContent can still say "live" after a stream has ended, and
+# search can still list the ended stream. actualEndTime is what settles it.
+T_YESTERDAY="2026-10-14T22:20:00Z"
+T_TODAY="2026-10-15T08:05:00Z"
+
+echo "Current stream says live but has ended: treated as dead and repaired"
+setup "[$CAM_T]"
+echo "{\"items\":[$(video OLDtttttttt 'Cape Town Live Stream 24/7' live true UCflooring "$T_YESTERDAY" 2026-10-15T08:00:00Z)]}" > "$FIXTURES/videos.json"
+echo '{"items":[{"id":{"videoId":"NEWtttttttt"},"snippet":{"title":"Cape Town Live Stream 24/7"}}]}' > "$FIXTURES/search.json"
+echo "{\"items\":[$(video NEWtttttttt 'Cape Town Live Stream 24/7' live true UCflooring "$T_TODAY")]}" > "$FIXTURES/video-NEWtttttttt.json"
+run_case
+expect "one camera changed" "$CHANGED" 1
+expect "automerge allowed" "$AUTOMERGE" true
+expect "stream URL rewritten" "$(URL_OF table-mountain)" "https://www.youtube.com/embed/NEWtttttttt"
+expect "summary gives the end time" "$(grep -c 'ended at 2026-10-15T08:00:00Z' "$WORK/summary.md")" 1
+
+echo "Current stream is titled LIVE REPLAY: treated as dead and repaired"
+setup "[$CAM_T]"
+echo "{\"items\":[$(video OLDtttttttt 'Cape Town Live | 14 Oct 2026 | LIVE REPLAY' live true UCflooring "$T_YESTERDAY")]}" > "$FIXTURES/videos.json"
+echo '{"items":[{"id":{"videoId":"NEWtttttttt"},"snippet":{"title":"Cape Town Live Stream 24/7"}}]}' > "$FIXTURES/search.json"
+echo "{\"items\":[$(video NEWtttttttt 'Cape Town Live Stream 24/7' live true UCflooring "$T_TODAY")]}" > "$FIXTURES/video-NEWtttttttt.json"
+run_case
+expect "one camera changed" "$CHANGED" 1
+expect "stream URL rewritten" "$(URL_OF table-mountain)" "https://www.youtube.com/embed/NEWtttttttt"
+
+echo "Search's only hit is yesterday's ended stream: skipped, uploads finds today's"
+setup "[$CAM_T]"
+echo "{\"items\":[$(video OLDtttttttt 'Cape Town Live Stream at Night' none true UCflooring 2026-10-14T16:00:00Z "$T_YESTERDAY")]}" > "$FIXTURES/videos.json"
+echo '{"items":[{"id":{"videoId":"YESTERDAYyy"},"snippet":{"title":"Cape Town Live Stream 24/7"}}]}' > "$FIXTURES/search.json"
+echo '{"items":[{"contentDetails":{"videoId":"NEWtttttttt"}},{"contentDetails":{"videoId":"YESTERDAYyy"}},{"contentDetails":{"videoId":"OLDtttttttt"}}]}' > "$FIXTURES/playlist.json"
+echo "{\"items\":[$(video YESTERDAYyy 'Cape Town Live Stream 24/7' live true UCflooring 2026-10-14T10:00:00Z 2026-10-14T16:00:00Z),$(video NEWtttttttt 'Cape Town Live Stream 24/7' live true UCflooring "$T_TODAY")]}" > "$FIXTURES/video-YESTERDAYyy,NEWtttttttt.json"
+run_case
+expect "one camera changed" "$CHANGED" 1
+expect "automerge allowed" "$AUTOMERGE" true
+expect "today's stream chosen" "$(URL_OF table-mountain)" "https://www.youtube.com/embed/NEWtttttttt"
+expect "not reported as ambiguous" "$(grep -c 'ambiguous' "$WORK/summary.md")" 0
+
+echo "Only live match started before the current stream: never moves backwards"
+setup "[$CAM_T]"
+echo "{\"items\":[$(video OLDtttttttt 'Cape Town Live Stream 24/7' none true UCflooring "$T_TODAY" 2026-10-15T09:00:00Z)]}" > "$FIXTURES/videos.json"
+echo '{"items":[{"id":{"videoId":"YESTERDAYyy"},"snippet":{"title":"Cape Town Live Stream 24/7"}}]}' > "$FIXTURES/search.json"
+echo "{\"items\":[$(video YESTERDAYyy 'Cape Town Live Stream 24/7' live true UCflooring "$T_YESTERDAY")]}" > "$FIXTURES/video-YESTERDAYyy.json"
+run_case
+expect "nothing changed" "$CHANGED" 0
+expect "stream URL untouched" "$(URL_OF table-mountain)" "https://www.youtube.com/embed/OLDtttttttt"
+expect "summary says why" "$(grep -c 'started before the current stream' "$WORK/summary.md")" 1
+
+echo "Only live match is a LIVE REPLAY broadcast: never picked"
+setup "[$CAM_T]"
+echo "{\"items\":[$(video OLDtttttttt 'Cape Town Live Stream 24/7' none true UCflooring "$T_YESTERDAY" 2026-10-15T08:00:00Z)]}" > "$FIXTURES/videos.json"
+echo '{"items":[{"id":{"videoId":"REPLAYrrrrr"},"snippet":{"title":"Cape Town Live | 14 Oct 2026 | LIVE REPLAY"}}]}' > "$FIXTURES/search.json"
+echo "{\"items\":[$(video REPLAYrrrrr 'Cape Town Live | 14 Oct 2026 | LIVE REPLAY' live true UCflooring "$T_TODAY")]}" > "$FIXTURES/video-REPLAYrrrrr.json"
+run_case
+expect "nothing changed" "$CHANGED" 0
+expect "summary says replay" "$(grep -c 'replay)' "$WORK/summary.md")" 1
 
 echo "Search and uploads both fail: retry later, change nothing"
 setup "[$CAM_T]"
