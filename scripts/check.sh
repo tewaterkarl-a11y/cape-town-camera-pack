@@ -83,7 +83,7 @@ if [ -n "${YT_API_KEY:-}" ]; then
   done
   total=${#rows[@]}
   api_resp=$(curl -fsS --max-time 20 \
-    "https://www.googleapis.com/youtube/v3/videos?part=snippet,status&id=${ids}&key=${YT_API_KEY}" 2>/dev/null)
+    "https://www.googleapis.com/youtube/v3/videos?part=snippet,status,liveStreamingDetails&id=${ids}&key=${YT_API_KEY}" 2>/dev/null)
   if [ -z "$api_resp" ]; then
     echo "YouTube Data API call failed — skipping camera checks this run." >&2
   else
@@ -92,10 +92,19 @@ if [ -n "${YT_API_KEY:-}" ]; then
       vid=$(echo "$url" | sed -E 's#.*/embed/([A-Za-z0-9_-]{11}).*#\1#')
       state=$(echo "$api_resp" | jq -r --arg v "$vid" '.items[] | select(.id == $v) | .snippet.liveBroadcastContent // "missing"')
       embeddable=$(echo "$api_resp" | jq -r --arg v "$vid" '.items[] | select(.id == $v) | .status.embeddable')
+      ended_at=$(echo "$api_resp" | jq -r --arg v "$vid" '.items[] | select(.id == $v) | .liveStreamingDetails.actualEndTime // empty')
+      title=$(echo "$api_resp" | jq -r --arg v "$vid" '.items[] | select(.id == $v) | .snippet.title // empty')
       if [ -z "$state" ]; then
         failed_ids+=("CAMERA REMOVED: ${name} (${id}, video ${vid}) — video no longer exists or is private")
       elif [ "$state" != "live" ]; then
         failed_ids+=("CAMERA NOT LIVE: ${name} (${id}, video ${vid}) — liveBroadcastContent=${state}")
+      # liveBroadcastContent can still say "live" after a stream has ended,
+      # while visitors see its recording (2026-10-15). actualEndTime settles
+      # it. Same rule as auto-repoint.sh, so the repair job agrees it is dead.
+      elif [ -n "$ended_at" ]; then
+        failed_ids+=("CAMERA NOT LIVE: ${name} (${id}, video ${vid}) — stream ended at ${ended_at}; visitors see its recording")
+      elif echo "$title" | grep -qi 'replay'; then
+        failed_ids+=("CAMERA NOT LIVE: ${name} (${id}, video ${vid}) — titled as a replay: ${title}")
       elif [ "$embeddable" = "false" ]; then
         failed_ids+=("CAMERA NOT EMBEDDABLE: ${name} (${id}, video ${vid}) — live on YouTube but the owner disabled embedding, so it will not play on the site")
       fi
