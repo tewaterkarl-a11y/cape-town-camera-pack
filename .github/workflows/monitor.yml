@@ -13,9 +13,10 @@ name: Monitor site and cameras
 
 on:
   schedule:
-    # Hourly (GitHub cron is best-effort, not exact). Every 6 hours left an
-    # ended stream's recording playing for up to ~4 hours; a healthy check
-    # costs 1 YouTube API unit, so hourly is cheap.
+    # Asks for hourly, but GitHub has started it only every 3 to 8 hours
+    # (12 to 15 October 2026). watch.yml checks every 10 minutes and starts
+    # this workflow when it finds a problem, so repairs no longer wait on
+    # this schedule.
     - cron: "23 * * * *"
   workflow_dispatch: {}
 
