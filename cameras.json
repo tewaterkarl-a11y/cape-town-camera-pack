@@ -1,6 +1,6 @@
 {
   "version": "1.9",
-  "updated": "2026-10-16",
+  "updated": "2026-10-17",
   "cameras": [
     {
       "id": "seapoint-lions-head",
@@ -118,7 +118,7 @@
       "id": "table-mountain-lions-head",
       "name": "Table Mountain & Lion’s Head Panorama",
       "type": "youtube",
-      "streamUrl": "https://www.youtube.com/embed/3s4oze8MRMk",
+      "streamUrl": "https://www.youtube.com/embed/h89e8FHzz2M",
       "enabled": true,
       "location": {
         "area": "City Bowl",
