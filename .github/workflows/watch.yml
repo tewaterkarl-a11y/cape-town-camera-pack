@@ -46,7 +46,6 @@ jobs:
       - name: Check every 10 minutes and start the monitor on a problem
         run: |
           set -u
-          chmod +x scripts/check.sh
           stop_at=$((SECONDS + 345 * 60))
           last_start=-3600
           while [ "$SECONDS" -lt "$stop_at" ]; do
@@ -54,8 +53,18 @@ jobs:
             if git fetch -q --depth 1 origin main; then
               git reset -q --hard FETCH_HEAD
             fi
-            REPORT_FILE=report.txt scripts/check.sh || true
-            if [ -s report.txt ]; then
+            # Run through bash: check.sh is not executable in git, and the
+            # reset above undoes any chmod. On 15 October that made every
+            # check fail with "Permission denied" for six hours while the
+            # run stayed green. check.sh always exits 0 when it runs, so a
+            # failure here means no check happened: fail the run loudly.
+            if ! REPORT_FILE=report.txt bash scripts/check.sh; then
+              echo "::error::scripts/check.sh could not run, so cameras are not being checked."
+              exit 1
+            fi
+            if [ ! -s report.txt ]; then
+              echo "$(date -u '+%H:%M') all clear"
+            else
               echo "$(date -u '+%H:%M') problem found:"; cat report.txt
               if [ $((SECONDS - last_start)) -ge 3600 ]; then
                 if gh workflow run monitor.yml --repo "$GITHUB_REPOSITORY" --ref main; then
