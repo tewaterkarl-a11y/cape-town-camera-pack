@@ -74,6 +74,7 @@ jobs:
     permissions:
       issues: write
       contents: read
+      actions: read # to see whether the watcher is running
     env:
       GH_TOKEN: ${{ github.token }}
       ISSUE_TITLE: "Monitor alert: site or camera problem detected"
@@ -92,6 +93,36 @@ jobs:
         run: |
           chmod +x scripts/check.sh
           REPORT_FILE=report.txt scripts/check.sh
+
+      # The watcher is what catches an ended stream within 10 minutes. From
+      # 15 October to 6 November it ran without checking anything and nobody
+      # knew, so Table Mountain & Lion's Head showed an ended stream for 8
+      # hours on 5 to 6 November. It now fails its run when it cannot check;
+      # this turns a failed or missing watcher into an alert. Cancelled runs
+      # are ignored: they are hourly starts that queued behind a running one.
+      # GitHub has left gaps of over 2 hours between runs, hence 3 hours.
+      - name: Check the watcher is running
+        run: |
+          set -u
+          if ! runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow watch.yml --limit 20 \
+                --json status,conclusion,updatedAt); then
+            echo "::warning::Could not list the watcher's runs; skipping the watcher check this time."
+            exit 0
+          fi
+          line=$(echo "$runs" | jq -r --argjson now "$(date -u +%s)" '
+            if any(.[]; .status == "in_progress") then empty
+            else (map(select(.status == "completed" and .conclusion != "cancelled" and .conclusion != "skipped")) | first) as $last
+              | if $last == null or ($now - ($last.updatedAt | fromdateiso8601)) > 10800 then
+                  "WATCHER NOT RUNNING: \"Watch cameras between monitor runs\" has not run for 3 hours, so an ended stream can play for hours. Start it from the Actions tab."
+                elif $last.conclusion != "success" then
+                  "WATCHER FAILED: the latest \"Watch cameras between monitor runs\" run failed, so cameras are not being checked every 10 minutes. Open that run in the Actions tab for the error."
+                else empty end
+            end')
+          if [ -n "$line" ]; then
+            echo "$line" | tee -a report.txt
+          else
+            echo "Watcher is running or finished cleanly within 3 hours."
+          fi
 
       - name: Open, update, or close the alert issue
         run: |
