@@ -1,6 +1,6 @@
 name: Test scripts
 
-# Runs the auto-repoint tests (with the YouTube API faked) whenever a PR
+# Runs the auto-repoint and health-check tests (with the network faked) whenever a PR
 # changes the scripts or workflows, so a change to the repair logic is proved
 # before it can touch cameras.json. Read-only, no secrets.
 
@@ -21,3 +21,5 @@ jobs:
       - uses: actions/checkout@v5
       - name: Auto-repoint decisions
         run: bash scripts/test-auto-repoint.sh
+      - name: Health check reports whether cameras were checked
+        run: bash scripts/test-check.sh

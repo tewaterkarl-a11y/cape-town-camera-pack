@@ -2,6 +2,12 @@
 # Health check for Cape Town Window: site uptime + YouTube liveness per camera.
 # Writes a failure report to $REPORT_FILE (one line per problem) and exits 0;
 # the workflow decides whether to open/close the alert issue.
+#
+# An empty report only means "healthy" if the cameras were actually checked.
+# When they could not be (Data API down, quota spent, key missing), the report
+# is empty too, so $STATUS_FILE (optional) records which it was: "checked", or
+# "not checked: <reason>". The watcher uses it so that a run of skipped checks
+# fails loudly instead of logging "all clear" (2026-11-06).
 set -u
 
 # The canonical address. The apex 301-redirects here, so check this one
@@ -10,7 +16,9 @@ SITE_URL="https://www.capetownwindow.com"
 APEX_URL="https://capetownwindow.com"
 UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36"
 REPORT_FILE="${REPORT_FILE:-report.txt}"
+STATUS_FILE="${STATUS_FILE:-/dev/null}"
 : > "$REPORT_FILE"
+cameras_status="not checked: unknown reason"
 
 # --- 1. Site uptime -----------------------------------------------------------
 # -L follows redirects. Without it this check reported SITE DOWN for two runs on
@@ -86,6 +94,7 @@ if [ -n "${YT_API_KEY:-}" ]; then
     "https://www.googleapis.com/youtube/v3/videos?part=snippet,status,liveStreamingDetails&id=${ids}&key=${YT_API_KEY}" 2>/dev/null)
   if [ -z "$api_resp" ]; then
     echo "YouTube Data API call failed — skipping camera checks this run." >&2
+    cameras_status="not checked: the YouTube Data API call failed (outage, spent quota or a bad key)"
   else
     for row in "${rows[@]}"; do
       id=$(echo "$row" | cut -f1); name=$(echo "$row" | cut -f2); url=$(echo "$row" | cut -f3)
@@ -110,6 +119,7 @@ if [ -n "${YT_API_KEY:-}" ]; then
       fi
     done
     checks_trusted=true  # API answers are real data; no bot-wall ambiguity
+    cameras_status="checked"
   fi
 else
   # Fallback path (no API key): scrape-based checks. YouTube usually bot-walls
@@ -137,11 +147,18 @@ fi
 if [ "${checks_trusted:-false}" != true ] && [ "$total" -gt 0 ] && \
    [ "${#failed_ids[@]}" -eq "$total" ] && [ "$site_ok" = true ]; then
   echo "All ${total} cameras unreadable from this runner — likely YouTube bot wall, not real outages. Skipping camera alerts." >&2
+  cameras_status="not checked: YT_API_KEY is not set and YouTube blocked the fallback check"
 else
+  # The scrape path read at least one camera, so it is a real answer.
+  if [ -z "${YT_API_KEY:-}" ]; then cameras_status="checked"; fi
   for line in "${failed_ids[@]}"; do
     echo "$line" >> "$REPORT_FILE"
   done
 fi
 
-echo "Checked site + ${total} cameras; $(wc -l < "$REPORT_FILE") problem(s) recorded." >&2
+# No enabled cameras is a real answer, not a skipped check.
+[ "$total" -eq 0 ] && cameras_status="checked"
+echo "$cameras_status" > "$STATUS_FILE"
+
+echo "Checked site + ${total} cameras; $(wc -l < "$REPORT_FILE") problem(s) recorded. Cameras: ${cameras_status}." >&2
 exit 0
